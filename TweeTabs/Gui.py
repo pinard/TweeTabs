@@ -357,7 +357,7 @@ class Gui:
     @callback
     def tab_select_add_inputs_cb(self, action):
         for tab in self.argument_tabs():
-            if isinstance(tab, Difference):
+            if isinstance(tab, Tab.Difference):
                 tab.inputs[0].select()
                 for tab in tab.inputs[1:]:
                     tab.select(complement=True)
