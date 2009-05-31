@@ -1,0 +1,11 @@
+The TweeTabs project aims the production of yet another Twitter reader,
+including machinery for personal management of Twitter lists.
+
+This project implements a generic tool for handling sets, each
+represented with a notebook tab.  The graphical user interface allows
+the user to define tabs as function of other tabs through usual
+operations on sets, complemented by a few other interactive facilities.
+This framework is then particularized into a Tweeter reader, and the tab
+operations help the user at managing Twitter overall.
+
+For more information, please visit http://tweetabs.progiciels-bpi.ca/ .

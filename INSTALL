@@ -1,0 +1,11 @@
+There is a reachable copy of my own sandbox repository for TweeTabs.  To
+get and install your own copy, try these commands:
+
+   git clone git://tweetabs.progiciels-bpi.ca/tweetabs
+   cd tweetabs
+   python setup.py install
+
+The author reserves the right of happily tampering with the Git history
+and resetting branches at any time — users may then have to re-clone.
+Moreover, if the Git clone server does not respond, just tell me and
+I'll restart it.

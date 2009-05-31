@@ -1,0 +1,14 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright © 2009 Progiciels Bourbeau-Pinard inc.
+# François Pinard <pinard@iro.umontreal.ca>, 2009.
+
+"""\
+A Twitter reader and personal manager - Launcher.
+"""
+
+__metaclass__ = type
+import sys
+
+from TweeTabs import Main
+Main.main(*sys.argv[1:])

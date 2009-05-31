@@ -1,0 +1,474 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+# Copyright © 2009 Progiciels Bourbeau-Pinard inc.
+# François Pinard <pinard@iro.umontreal.ca>, 2009.
+
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2, or (at your option)
+# any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software Foundation,
+# Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.  */
+
+"""\
+A Twitter reader and personal manager - Tab structures.
+"""
+
+__metaclass__ = type
+import atexit, re, sys
+
+import Common, Strip
+gtk = Common.gtk
+#gobject = Common.gobject
+
+class Error(Common.Error):
+    pass
+
+## Base types.
+
+class Tab:
+    ordinal = 0
+    registry = {}
+    base = None
+    name = None
+    frozen = False
+    hidden = False
+    # Values are False, True and 2 (another True for complement sets)
+    selected = False
+
+    def __init__(self, *inputs):
+        Tab.ordinal += 1
+        self.ordinal = Tab.ordinal
+        Tab.registry[self.ordinal] = self
+        self.inputs = []
+        self.added = set()
+        self.deleted = set()
+        self.outputs = set()
+        self.strips = set()
+        self.strip_widget = {}
+        self.create_tab_widget()
+        if self.base is not None:
+            self.set_name(self.base)
+        self.freeze()
+        for input in inputs:
+            input.add_output(self)
+        self.unfreeze()
+        self.goto()
+
+    def __str__(self):
+        return '%s("%s")' % (type(self).__name__,
+                             self.name or str(self.ordinal))
+
+    def set_name(self, name):
+        if self.name is None:
+            del Tab.registry[self.ordinal]
+        else:
+            del Tab.registry[self.name]
+            del self.name
+        if name is None:
+            Tab.registry[self.ordinal] = self
+        else:
+            if name in Tab.registry:
+                match = re.match('(.*)([0-9]+)$', name)
+                if match:
+                    base = match.group(1)
+                    counter = int(match.group(2))
+                else:
+                    base = name
+                    counter = 1
+                counter += 1
+                name = base + str(counter)
+                while name in Tab.registry:
+                    counter += 1
+                    name = base + str(counter)
+            self.name = name
+            Tab.registry[name] = self
+        self.name = name
+        self.update_tab_label()
+
+    def close(self):
+        for input in self.inputs:
+            input.outputs.discard(self)
+        self.inputs = []
+        for output in list(self.outputs):
+            self.discard_output(output)
+        self.strips = set()
+
+    def goto(self):
+        page = Common.gui.notebook_widget.page_num(self.tab_widget)
+        if page >= 0:
+            Common.gui.notebook_widget.set_current_page(page)
+
+    def select(self, complement=False):
+        if complement:
+            wanted = 2
+        else:
+            wanted = True
+        if self.selected != wanted:
+            self.selected = wanted
+            if self.hidden:
+                self.unhide()
+            else:
+                self.update_tab_label()
+
+    def unselect(self):
+        if self.selected:
+            self.selected = False
+            self.update_tab_label()
+
+    def freeze(self):
+        if not self.frozen:
+            self.frozen = True
+            self.update_tab_label()
+
+    def unfreeze(self):
+        if self.frozen:
+            self.frozen = False
+            self.refresh()
+            self.update_tab_label()
+
+    def hide(self):
+        if not self.hidden:
+            self.undisplay_strips(self.strip_widget.keys())
+            self.hidden = True
+
+    def unhide(self):
+        if self.hidden:
+            self.display_strips(self.strips)
+            self.hidden = False
+
+    def add_input(self, tab):
+        tab.add_output(self)
+
+    def discard_input(self, tab):
+        tab.discard_output(self)
+
+    def add_output(self, tab):
+        self.outputs.add(tab)
+        if self not in tab.inputs:
+            tab.inputs.append(self)
+            if not tab.frozen:
+                tab.refresh()
+
+    def discard_output(self, tab):
+        self.outputs.discard(tab)
+        if self in tab.inputs:
+            tab.inputs.remove(self)
+            if not tab.frozen:
+                tab.refresh()
+
+    def refresh(self):
+        strips = (self.recomputed_strips() | self.added) - self.deleted
+        self.discard_strips(self.strips - strips)
+        self.add_strips(strips)
+
+    def recomputed_strips(self):
+        # Shall be defined in derived classes.
+        raise NotImplementedError
+
+    def allowable_strips(self, strips):
+        # Shall be defined in derived classes.
+        raise NotImplementedError
+
+    def add_strips(self, strips):
+        strips = self.allowable_strips(strips) - self.strips
+        self.strips |= strips
+        for output in self.outputs:
+            if not output.frozen:
+                output.add_strips(strips)
+        if not self.hidden:
+            self.display_strips(strips)
+        return strips
+
+    def discard_strips(self, strips):
+        strips = strips & self.strips
+        self.strips -= strips
+        for output in self.outputs:
+            if not output.frozen:
+                output.discard_strips(strips)
+        if not self.hidden:
+            self.undisplay_strips(strips)
+        return strips
+
+    def display_strips(self, strips):
+        for strip in sorted(strips):
+            widget = strip.new_widget()
+            self.strip_widget[strip] = widget
+            self.tab_vbox.pack_start(widget, False, False)
+        self.update_tab_label()
+
+    def undisplay_strips(self, strips):
+        for strip in strips:
+            widget = self.strip_widget[strip]
+            del self.strip_widget[strip]
+            self.tab_vbox.remove(widget)
+        self.update_tab_label()
+
+    def create_tab_widget(self):
+        window = gtk.ScrolledWindow()
+        window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
+        vbox = self.tab_vbox = gtk.VBox(False, Common.gui.spacing)
+        window.add_with_viewport(vbox)
+        window.show_all()
+        Common.gui.notebook_widget.append_page(window, gtk.Label())
+        Common.gui.notebook_widget.set_tab_reorderable(window, True)
+        self.tab_widget = window
+
+    def update_tab_label(self):
+        text = '<span'
+        if self.selected:
+            if self.selected == 2:
+                text += ' foreground="darkmagenta"'
+            else:
+                text += ' foreground="darkred"'
+        if self.name is None:
+            name = '%d' % self.ordinal
+            text += ' style="italic"'
+        else:
+            name = self.name
+        if not self.frozen:
+           text += ' weight="bold"'
+        text += ('>' + Common.escape(name) + '</span>'
+                 ' <span size="small" foreground="gray50">'
+                 + str(len(self.tab_vbox.get_children()))
+                 + '</span>')
+        label = gtk.Label()
+        label.set_markup(text)
+        Common.gui.notebook_widget.set_tab_label(self.tab_widget, label)
+
+class Preset(Tab):
+
+    def __init__(self):
+        self.preset_strips = set()
+        Tab.__init__(self)
+
+    def add_input(self):
+        raise NotImplementedError
+
+    def discard_input(self):
+        raise NotImplementedError
+
+    def recomputed_strips(self):
+        return self.preset_strips
+
+    def allowable_strips(self, strips):
+        return strips & self.preset_strips
+
+class Periodic(Preset):
+    period = None
+    capacity = 200
+
+    def __init__(self):
+        Preset.__init__(self)
+        Common.gui.delay(0, self.reload_loop)
+
+    def reload_loop(self):
+        if self.reload():
+            period = self.period
+        else:
+            period = 5
+        Common.gui.delay(period, self.reload_loop)
+
+    def reload(self):
+        # Shall be defined in derived classes.
+        raise NotImplementedError
+
+    def refresh(self):
+        if self.capacity is not None:
+            if len(self.preset_strips) > self.capacity:
+                self.preset_strips = set(
+                        sorted(self.preset_strips)[-self.capacity:])
+        Preset.refresh(self)
+
+class Union(Tab):
+    base = 'Union'
+
+    def recomputed_strips(self):
+        strips = set()
+        for input in self.inputs:
+            strips |= input.strips
+        return strips
+
+    def allowable_strips(self, strips):
+        unwanted = set(strips)
+        for input in self.inputs:
+            unwanted -= input.strips
+        return strips - unwanted
+
+class Closeable(Union):
+    modified = False
+
+    def close(self):
+        if self.modified:
+            self.save_strips()
+        Union.close(self)
+
+    def add_strips(self, strips):
+        strips = Union.add_strips(self, strips)
+        if strips and not self.modified:
+            self.modified = True
+            atexit.register(self.close)
+        return strips
+
+    def discard_strips(self, strips):
+        strips = Union.discard_strips(self, strips)
+        if strips and not self.modified:
+            self.modified = True
+            atexit.register(self.close)
+        return strips
+
+## Final types.
+
+class Difference(Tab):
+    base = 'Diff'
+
+    def add_output(self, tab):
+        negative = set(self.inputs[1:])
+        seen = set()
+        stack = set(tab.outputs)
+        while stack:
+            top = stack.pop()
+            if top in negative:
+                raise Error("Negative loop in tab plumbing")
+            seen.add(top)
+            for output in top.outputs:
+                if output not in seen:
+                    stack.append(output)
+        Tab.add_output(self, tab)
+
+    def recomputed_strips(self):
+        strips = set()
+        if self.inputs:
+            strips |= self.inputs[0].strips
+            for input in self.inputs[1:]:
+                self.strips -= input.strips
+        return strips
+
+    def allowable_strips(self, strips):
+        strips &= self.inputs[0].strips
+        for input in self.inputs[1:]:
+            strips -= input.strips
+        return strips
+
+class Direct_timeline(Periodic):
+    base = 'Direct'
+    period = 3 * 60
+
+    def reload(self):
+        return Common.manager.load_direct_timeline(self)
+
+class Direct_sent_timeline(Periodic):
+    base = 'DSent'
+    period = 60 * 60
+
+    def reload(self):
+        return Common.manager.load_direct_sent_timeline(self)
+
+class Followers(Periodic):
+    base = '…ers'
+    period = 60 * 60
+
+    def reload(self):
+        return Common.manager.load_followers(self)
+
+class Following(Periodic):
+    base = '…ing'
+    period = 60 * 60
+
+    def reload(self):
+        return Common.manager.load_following(self)
+
+class Friends_timeline(Periodic):
+    base = 'Friends'
+    period = 10 * 60
+
+    def reload(self):
+        return Common.manager.load_friends_timeline(self)
+
+class Id_input(Preset):
+
+    def __init__(self, file_name):
+        self.file_name = file_name
+        Preset.__init__(self)
+        try:
+            lines = file(self.file_name)
+        except IOError, exception:
+            raise Error(str(exception))
+        else:
+            for line in lines:
+                line = line.rstrip()
+                if line:
+                    strip = Strip.Strip(line)
+                    self.preset_strips.add(strip)
+        self.add_strips(self.preset_strips)
+
+class Id_output(Closeable):
+
+    def __init__(self, file_name, *inputs):
+        self.file_name = file_name
+        Closeable.__init__(self, *inputs)
+
+    def save_strips(self):
+        write = file(self.file_name, 'w').write
+        for strip in sorted(self.strips):
+            write(str(strip) + '\n')
+
+class Interactive(Tab):
+
+    def __init__(self, values):
+        self.preset_strips = set(map(Strip.Strip, values))
+        Tab.__init__(self)
+
+    def recomputed_strips(self):
+        return self.preset_strips
+
+    def allowable_strips(self, strips):
+        return strips & self.preset_strips
+
+class Intersection(Tab):
+    base = 'Inter'
+
+    def recomputed_strips(self):
+        strips = set()
+        if self.inputs:
+            strips |= self.inputs[0].strips
+            for input in self.inputs[1:]:
+                strips &= input.strips
+        return strips
+
+    def allowable_strips(self, strips):
+        for input in self.inputs:
+            strips &= input.strips
+        return strips
+
+class Public_timeline(Periodic):
+    base = 'Public'
+    period = 2 * 60
+
+    def reload(self):
+        return Common.manager.load_public_timeline(self)
+
+class Replies_timeline(Periodic):
+    base = 'Replies'
+    period = 2 * 60
+
+    def reload(self):
+        return Common.manager.load_replies_timeline(self)
+
+class User_timeline(Periodic):
+    period = 4 * 60
+
+    def __init__(self):
+        import Manager
+        self.base = Manager.user.capitalize()
+        Periodic.__init__(self)
+
+    def reload(self):
+        return Common.manager.load_user_timeline(self)
