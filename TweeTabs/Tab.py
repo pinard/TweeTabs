@@ -376,14 +376,14 @@ class Followers(Periodic):
     period = 60 * 60
 
     def reload(self):
-        return Common.manager.load_followers(self)
+        return Common.manager.fetch_followers(self)
 
 class Following(Periodic):
     base = '…ing'
     period = 60 * 60
 
     def reload(self):
-        return Common.manager.load_following(self)
+        return Common.manager.fetch_following(self)
 
 class Friends_timeline(Periodic):
     base = 'Friends'

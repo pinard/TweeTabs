@@ -24,4 +24,4 @@ A Twitter reader and personal manager - Module initialisation.
 # Identification of version.
 
 __package__ = 'TweeTabs'
-__version__ = '0.0'
+__version__ = '0.1'
