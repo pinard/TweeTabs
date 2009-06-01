@@ -148,7 +148,7 @@ class Gui:
                     None, self.tab_select_clear_all_cb),
                 ('Tab Select Inverse', None, "Inverse", None,
                     None, self.tab_select_inverse_cb),
-                ('Tab Select Toggle', None, "Toggle selected", None,
+                ('Tab Select Toggle', None, "Toggle select", None,
                     None, self.tab_select_toggle_cb),
                 ('Tab Timeline Direct', None, "Direct", None,
                     None, self.tab_timeline_direct_cb),
