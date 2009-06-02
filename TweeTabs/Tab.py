@@ -22,11 +22,9 @@ A Twitter reader and personal manager - Tab structures.
 """
 
 __metaclass__ = type
-import atexit, re, sys
+import atexit, gtk, re, sys
 
 import Common, Strip
-gtk = Common.gtk
-#gobject = Common.gobject
 
 class Error(Common.Error):
     pass

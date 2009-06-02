@@ -22,11 +22,9 @@ A Twitter reader and personal manager - (part of) User Interface.
 """
 
 __metaclass__ = type
-import heapq, sys, time
+import gobject, gtk, heapq, sys, time
 
 import Common, Tab
-gtk = Common.gtk
-gobject = Common.gobject
 
 class Error(Common.Error):
     pass

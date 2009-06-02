@@ -22,14 +22,13 @@ A Twitter reader and personal manager - Twitter API management.
 """
 
 __metaclass__ = type
-import os, sys
+import gobject, os, sys
 
 import simplejson
 from twyt.twitter import Twitter, TwitterException
 from twyt.data import RateLimit, Status, StatusList
 
 import Common, Strip
-gobject = Common.gobject
 
 twitter = Twitter()
 

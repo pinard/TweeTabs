@@ -25,7 +25,6 @@ from xml.sax.saxutils import escape
 
 import pygtk
 pygtk.require('2.0')
-import gobject, gtk
 
 class Error(Exception):
     pass

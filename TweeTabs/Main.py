@@ -35,11 +35,9 @@ Debugging options:
 """
 
 __metaclass__ = type
-import os, sys
+import gobject, gtk, os, sys
 
 import Common, Gui, Tab
-gtk = Common.gtk
-gobject = Common.gobject
 
 class Main:
     configdir = os.path.expanduser('~/.tweetabs')
