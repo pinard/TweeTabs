@@ -37,7 +37,7 @@ Debugging options:
 __metaclass__ = type
 import gobject, gtk, os, sys
 
-import Common, Gui, Tab
+import Common, Gui, Strip, Tab
 
 class Main:
     configdir = os.path.expanduser('~/.tweetabs')
@@ -73,7 +73,7 @@ class Main:
 
         # Read in default initialization as set by user.
         if os.path.exists(self.configdir + '/defaults.py'):
-            context = {'Gui': Gui.Gui, 'Twitter': Manager}
+            context = {'Gui': Gui.Gui, 'Strip': Strip, 'Twitter': Manager}
             execfile(self.configdir + '/defaults.py', context, {})
         if Manager.user is None or Manager.password is None:
             sys.exit("Twitter user not set, set it in your defaults.py file.")
