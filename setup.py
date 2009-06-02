@@ -24,7 +24,7 @@ def adjust(input, output):
 adjust('__init__.py.in', 'TweeTabs/__init__.py')
 
 setup(name=package, version=version,
-      description="A Twitter reader and personal manager (still vaporware)",
+      description="A Twitter reader and personal manager",
       author='François Pinard', author_email='pinard@iro.umontreal.ca',
       url='http://pinard.progiciels-bpi.ca/notes/TweeTabs_project.html',
       scripts=['scripts/tweetabs'], packages=['TweeTabs'])

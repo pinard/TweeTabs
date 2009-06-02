@@ -68,7 +68,8 @@ class Tweet(Strip):
             text.set_selectable(True)
             text.set_alignment(0, 0)
             text.set_markup(
-                    '<span weight="bold" foreground="brown">'
+                    '<span weight="bold" foreground="'
+                    + Common.gui.user_color + '">'
                     + Common.escape(self.status.user.screen_name + ':')
                     + '</span> ' + markup_with_links(self.status.text))
             hbox.pack_start(text)
@@ -115,13 +116,14 @@ def markup_with_links(text):
     for match in re.finditer(pattern, text):
         start = match.start()
         if text[start] == '@':
-            span = '<span foreground="brown">'
+            span = '<span foreground="' + Common.gui.user_color + '">'
         elif text[start] == '#':
-            span = '<span foreground="darkgreen">'
+            span = '<span foreground="' + Common.gui.tag_color + '">'
         elif text[start] == 'R':
             span = '<span weight="bold" style="italic">'
         else: # http:// or https://
-            span = '<span underline="single" foreground="blue">'
+            span = ('<span underline="single" foreground="'
+                    + Common.gui.url_color + '">')
         marked += (Common.escape(text[position:start])
                    + span + Common.escape(match.group()) + '</span>')
         position = match.end()
@@ -165,7 +167,7 @@ def pixbuf_from_url(url):
         extra = (sy - sx) // 2
         im = im.crop((0, extra, sx, extra + sx))
     # Resize it.
-    im = im.resize((image_size, image_size))
+    im = im.resize((image_size, image_size), PIL.Image.ANTIALIAS)
     return pixbuf_from_pil(im)
 
 def pixbuf_from_pil(im):
@@ -222,4 +224,4 @@ class Image_loader:
             for image in images:
                 image.set_from_pixbuf(pixbuf)
 
-image_loader = Image_loader(800)
+image_loader = Image_loader()

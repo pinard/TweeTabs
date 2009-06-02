@@ -223,9 +223,9 @@ class Tab:
         text = '<span'
         if self.selected:
             if self.selected == 2:
-                text += ' foreground="darkmagenta"'
+                text += ' foreground="' + Common.gui.select2_color + '"'
             else:
-                text += ' foreground="darkred"'
+                text += ' foreground="' + Common.gui.select_color + '"'
         if self.name is None:
             name = '%d' % self.ordinal
             text += ' style="italic"'

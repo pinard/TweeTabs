@@ -47,6 +47,11 @@ class Gui:
     minimum_height = 200
     spacing = 7
     read_only_mode = False
+    select_color = 'red'
+    select2_color = 'darkmagenta'
+    user_color = 'brown'
+    tag_color = 'darkgreen'
+    url_color = 'blue'
 
     user_interface = '''\
 <menubar name="MenuBar">
