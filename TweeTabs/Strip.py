@@ -62,18 +62,21 @@ class Tweet(Strip):
     def new_widget(self):
 
         def tweet():
-            hbox = gtk.HBox()
-            text = gtk.Label()
-            text.set_line_wrap(True)
-            text.set_selectable(True)
-            text.set_alignment(0, 0)
-            text.set_markup(
+            label = gtk.Label()
+            label.set_line_wrap(True)
+            label.set_selectable(True)
+            label.set_alignment(0, 0)
+            label.set_markup(
                     '<span weight="bold" foreground="'
                     + Common.gui.user_color + '">'
                     + Common.escape(self.status.user.screen_name + ':')
                     + '</span> ' + markup_with_links(self.status.text))
-            hbox.pack_start(text)
-            return hbox
+            return label
+
+            #eventbox = gtk.EventBox()
+            #eventbox.add(label)
+            #eventbox.connect('button-press-event', self.tweet_clicked)
+            #return eventbox
 
         def info():
             label = gtk.Label()
@@ -102,6 +105,9 @@ class Tweet(Strip):
         hbox.pack_start(vbox)
         hbox.show_all()
         return hbox
+
+    #def tweet_clicked(self, widget, event):
+    #    print "Click", repr(self.status.text)
 
 ## Text services.
 
@@ -151,7 +157,16 @@ def transform_stamp(stamp):
 
 def pixbuf_from_url(url):
     # Get the image.
-    buffer = urllib.urlopen(url).read()
+    try:
+        buffer = urllib.urlopen(url).read()
+    except UnicodeError:
+        try:
+            buffer = urllib.urlopen(url.encode('ISO-8859-1')).read()
+        except UnicodeError:
+            try:
+                buffer = urllib.urlopen(url.encode('UTF-8')).read()
+            except UnicodeError:
+                return empty_pixbuf
     try:
         im = PIL.Image.open(StringIO.StringIO(buffer))
     except IOError:
