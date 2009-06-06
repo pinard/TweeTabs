@@ -22,7 +22,7 @@ A Twitter reader and personal manager - Strip structures.
 """
 
 __metaclass__ = type
-import PIL.Image, StringIO, gtk, re, sys, time, urllib
+import PIL.Image, StringIO, gtk, pango, re, sys, time, urllib
 
 import Common
 
@@ -61,34 +61,6 @@ class Tweet(Strip):
 
     def new_widget(self):
 
-        def tweet():
-            label = gtk.Label()
-            label.set_line_wrap(True)
-            label.set_selectable(True)
-            label.set_alignment(0, 0)
-            label.set_markup(
-                    '<span weight="bold" foreground="'
-                    + Common.gui.user_color + '">'
-                    + Common.escape(self.status.user.screen_name + ':')
-                    + '</span> ' + markup_with_links(self.status.text))
-            return label
-
-            #eventbox = gtk.EventBox()
-            #eventbox.add(label)
-            #eventbox.connect('button-press-event', self.tweet_clicked)
-            #return eventbox
-
-        def info():
-            label = gtk.Label()
-            label.set_alignment(0, 0)
-            label.set_markup(
-                    '<span size="small" foreground="gray50">'
-                     + Common.escape(transform_stamp(self.status.created_at))
-                     + '</span>, '
-                     + '<span size="small" style="italic" foreground="gray50">'
-                     + Common.escape(self.status.source) + '</span>')
-            return label
-
         def image():
             vbox = gtk.VBox()
             image = gtk.Image()
@@ -96,45 +68,86 @@ class Tweet(Strip):
             vbox.pack_start(image, False, False)
             return vbox
 
-        vbox = gtk.VBox()
-        vbox.pack_start(tweet(), False, False)
-        vbox.pack_start(info(), False, False)
+        def tweet():
+            # Prepare the display.
+            textview = gtk.TextView()
+            textview.set_editable(False)
+            textview.set_cursor_visible(False)
+            textview.set_wrap_mode(gtk.WRAP_WORD)
+            textbuffer = textview.get_buffer()
+            enditer = textbuffer.get_end_iter()
+            # Insert the sender.
+            textbuffer.insert_with_tags(
+                    enditer,
+                    self.status.user.screen_name + ':',
+                    textbuffer.create_tag(None,
+                                          foreground=Common.gui.user_color,
+                                          weight=pango.WEIGHT_BOLD))
+            textbuffer.insert(enditer, ' ')
+            # Insert the tweet proper.
+            text = re.sub('[ \n\r\b\f\0]+', ' ', self.status.text)
+            pattern = ('https?://[-_a-zA-Z0-9%./?&=#]+'
+                       '|@[^ :,]+'
+                       '|\\#[a-zA-Z][a-zA-Z0-9]+'
+                       '|RT\\b')
+            position = 0
+            for match in re.finditer(pattern, text):
+                start = match.start()
+                textbuffer.insert(enditer, text[position:start])
+                if text[start] == '@':
+                    tag = textbuffer.create_tag(
+                            None,
+                            foreground=Common.gui.user_color)
+                elif text[start] == '#':
+                    tag = textbuffer.create_tag(
+                            None,
+                            foreground=Common.gui.tag_color)
+                elif text[start] == 'R':
+                    tag = textbuffer.create_tag(
+                            None,
+                            weight=pango.WEIGHT_BOLD,
+                            style=pango.STYLE_ITALIC)
+                else: # http:// or https://
+                    tag = textbuffer.create_tag(
+                            None,
+                            underline=pango.UNDERLINE_SINGLE,
+                            foreground=Common.gui.url_color)
+                textbuffer.insert_with_tags(enditer, match.group(), tag)
+                position = match.end()
+            textbuffer.insert(enditer, text[position:])
+            # Insert the date and source
+            textbuffer.insert(enditer, '\n')
+            textbuffer.insert_with_tags(
+                    enditer,
+                    transform_stamp(self.status.created_at),
+                    textbuffer.create_tag(None,
+                                          #size=pango.SCALE_SMALL,
+                                          foreground="gray50"))
+            textbuffer.insert(enditer, ', ')
+            textbuffer.insert_with_tags(
+                    enditer,
+                    self.status.source,
+                    textbuffer.create_tag(None,
+                                          #size=pango.SCALE_SMALL,
+                                          style=pango.STYLE_ITALIC,
+                                          foreground="gray50"))
+            return textview
 
         hbox = gtk.HBox()
         hbox.pack_start(image(), False, False, Common.gui.spacing)
-        hbox.pack_start(vbox)
-        hbox.show_all()
-        return hbox
+        hbox.pack_start(tweet())
 
-    #def tweet_clicked(self, widget, event):
-    #    print "Click", repr(self.status.text)
+        eventbox = gtk.EventBox()
+        eventbox.add(hbox)
+        eventbox.connect('button-press-event', self.tweet_clicked)
+        eventbox.show_all()
+        return eventbox
+
+    def tweet_clicked(self, widget, event):
+        #print "Click", repr(self.status.text)
+        pass
 
 ## Text services.
-
-def markup_with_links(text):
-    text = re.sub('[ \n\r\b\f\0]+', ' ', text)
-    pattern = ('https?://[-_a-zA-Z0-9%./?&=#]+'
-               '|@[^ :,]+'
-               '|\\#[a-zA-Z][a-zA-Z0-9]+'
-               '|RT\\b')
-    marked = ''
-    position = 0
-    for match in re.finditer(pattern, text):
-        start = match.start()
-        if text[start] == '@':
-            span = '<span foreground="' + Common.gui.user_color + '">'
-        elif text[start] == '#':
-            span = '<span foreground="' + Common.gui.tag_color + '">'
-        elif text[start] == 'R':
-            span = '<span weight="bold" style="italic">'
-        else: # http:// or https://
-            span = ('<span underline="single" foreground="'
-                    + Common.gui.url_color + '">')
-        marked += (Common.escape(text[position:start])
-                   + span + Common.escape(match.group()) + '</span>')
-        position = match.end()
-    marked += Common.escape(text[position:])
-    return marked
 
 monthname_to_month = {
         'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
