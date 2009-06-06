@@ -97,6 +97,10 @@ class Gui:
     <menuitem action="Tab Delete"/>
   </menu>
   <menu action="Strip">
+    <menu action="Strip Select">
+      <menuitem action="Strip Select Clear all"/>
+      <menuitem action="Strip Select Inverse"/>
+    </menu>
   </menu>
   <menu action="Help">
   </menu>
@@ -116,6 +120,7 @@ class Gui:
                 ('Strip', None, "Strip"),
                 ('Tab', None, "Tab"),
                 # Sub menus.
+                ('Strip Select', None, "Select"),
                 ('Tab Compose', None, "Compose"),
                 ('Tab Configure', None, "Configure"),
                 ('Tab Select', None, "Select"),
@@ -125,6 +130,10 @@ class Gui:
             group.add_actions([
                 ('File Quit', None, "Quit", None,
                     None, self.file_quit_cb),
+                ('Strip Select Clear all', None, "Clear all", None,
+                    None, self.strip_select_clear_all_cb),
+                ('Strip Select Inverse', None, "Inverse", None,
+                    None, self.strip_select_inverse_cb),
                 ('Tab Compose Added', None, "Added", None,
                     None, self.tab_compose_added_cb),
                 ('Tab Compose Deleted', None, "Deleted", None,
@@ -295,6 +304,18 @@ class Gui:
     @callback
     def file_quit_cb(self, action):
         gtk.main_quit()
+
+    @callback
+    def strip_select_clear_all_cb(self, action):
+        tab = self.current_tab()
+        for strip_in_tab in tab.strip_in_tab.itervalues():
+            strip_in_tab.unselect()
+
+    @callback
+    def strip_select_inverse_cb(self, action):
+        tab = self.current_tab()
+        for strip_in_tab in tab.strip_in_tab.itervalues():
+            strip_in_tab.toggle_select()
 
     @callback
     def tab_compose_added_cb(self, action):
@@ -471,7 +492,7 @@ class Gui:
         if page >= 0:
             widget = self.notebook_widget.get_children()[page]
             for tab in Tab.Tab.registry.itervalues():
-                if tab.tab_widget is widget:
+                if tab.widget is widget:
                     return tab
 
     def get_string(self):

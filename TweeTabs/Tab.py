@@ -50,8 +50,8 @@ class Tab:
         self.deleted = set()
         self.outputs = set()
         self.strips = set()
-        self.strip_widget = {}
-        self.create_tab_widget()
+        self.strip_in_tab = {}
+        self.create_widget()
         if self.base is not None:
             self.set_name(self.base)
         self.freeze()
@@ -61,8 +61,7 @@ class Tab:
         self.goto()
 
     def __str__(self):
-        return '%s("%s")' % (type(self).__name__,
-                             self.name or str(self.ordinal))
+        return type(self).__name__ + ' ' + (self.name or str(self.ordinal))
 
     def set_name(self, name):
         if self.name is None:
@@ -100,7 +99,7 @@ class Tab:
         self.strips = set()
 
     def goto(self):
-        page = Common.gui.notebook_widget.page_num(self.tab_widget)
+        page = Common.gui.notebook_widget.page_num(self.widget)
         if page >= 0:
             Common.gui.notebook_widget.set_current_page(page)
 
@@ -134,7 +133,7 @@ class Tab:
 
     def hide(self):
         if not self.hidden:
-            self.undisplay_strips(self.strip_widget.keys())
+            self.undisplay_strips(self.strips)
             self.hidden = True
 
     def unhide(self):
@@ -197,19 +196,18 @@ class Tab:
 
     def display_strips(self, strips):
         for strip in sorted(strips):
-            widget = strip.new_widget()
-            self.strip_widget[strip] = widget
-            self.tab_vbox.pack_start(widget, False, False)
+            strip_in_tab = strip.in_tab_maker(self, strip)
+            self.strip_in_tab[strip] = strip_in_tab
+            self.tab_vbox.pack_start(strip_in_tab.widget, False, False)
         self.update_tab_label()
 
     def undisplay_strips(self, strips):
         for strip in strips:
-            widget = self.strip_widget[strip]
-            del self.strip_widget[strip]
-            self.tab_vbox.remove(widget)
+            self.tab_vbox.remove(self.strip_in_tab[strip].widget)
+            del self.strip_in_tab[strip]
         self.update_tab_label()
 
-    def create_tab_widget(self):
+    def create_widget(self):
         window = gtk.ScrolledWindow()
         window.set_policy(gtk.POLICY_AUTOMATIC, gtk.POLICY_AUTOMATIC)
         vbox = self.tab_vbox = gtk.VBox(False, Common.gui.spacing)
@@ -217,7 +215,7 @@ class Tab:
         window.show_all()
         Common.gui.notebook_widget.append_page(window, gtk.Label())
         Common.gui.notebook_widget.set_tab_reorderable(window, True)
-        self.tab_widget = window
+        self.widget = window
 
     def update_tab_label(self):
         text = '<span'
@@ -239,7 +237,7 @@ class Tab:
                  + '</span>')
         label = gtk.Label()
         label.set_markup(text)
-        Common.gui.notebook_widget.set_tab_label(self.tab_widget, label)
+        Common.gui.notebook_widget.set_tab_label(self.widget, label)
 
 class Preset(Tab):
 

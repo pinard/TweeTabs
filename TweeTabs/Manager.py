@@ -122,7 +122,7 @@ class Manager:
     @twytcall("fetching followers")
     def fetch_followers(self, tab):
         tab.preset_strips = set(map(
-            Strip.Strip,
+            Strip.User,
             simplejson.loads(twitter.social_graph_followers_ids())))
         tab.refresh()
         return True
@@ -130,7 +130,7 @@ class Manager:
     @twytcall("fetching following")
     def fetch_following(self, tab):
         tab.preset_strips = set(map(
-            Strip.Strip,
+            Strip.User,
             simplejson.loads(twitter.social_graph_friends_ids())))
         tab.refresh()
         return True

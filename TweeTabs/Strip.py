@@ -29,13 +29,40 @@ import Common
 image_size = 60
 image_loader_capacity = 800
 
+class Strip_in_tab:
+    selected = False
+
+    def __init__(self, tab, strip):
+        self.tab = tab
+        self.strip = strip
+        self.create_widget()
+
+    def __str__(self):
+        return str(self.strip) + ' in ' + str(self.tab)
+
+    def create_widget(self):
+        raise NotImplementedError
+
+    def select(self):
+        self.selected = True
+
+    def unselect(self):
+        self.selected = False
+
+    def toggle_select(self):
+        if self.selected:
+            self.unselect()
+        else:
+            self.select()
+
 class Strip:
+    in_tab_maker = Strip_in_tab
 
     def __init__(self, key):
         self.key = key
 
     def __str__(self):
-        return str(self.key)
+        return type(self).__name__ + ' ' + str(self.key)
 
     def __cmp__(self, other):
         return cmp(self.key, other.key)
@@ -43,28 +70,14 @@ class Strip:
     def __hash__(self):
         return hash(self.key)
 
-    def new_widget(self):
-        hbox = gtk.HBox()
-        button = gtk.Button('☺')
-        hbox.pack_start(button, False, False, Common.gui.spacing)
-        label = gtk.Label(str(self))
-        label.set_line_wrap(True)
-        hbox.pack_start(label, False, False)
-        hbox.show_all()
-        return hbox
+class Tweet_in_tab(Strip_in_tab):
 
-class Tweet(Strip):
-
-    def __init__(self, status):
-        self.status = status
-        Strip.__init__(self, status.id)
-
-    def new_widget(self):
+    def create_widget(self):
 
         def image():
             vbox = gtk.VBox()
             image = gtk.Image()
-            image_loader.load(image, self.status.user.profile_image_url)
+            image_loader.load(image, status.user.profile_image_url)
             vbox.pack_start(image, False, False)
             return vbox
 
@@ -79,13 +92,13 @@ class Tweet(Strip):
             # Insert the sender.
             textbuffer.insert_with_tags(
                     enditer,
-                    self.status.user.screen_name + ':',
+                    status.user.screen_name + ':',
                     textbuffer.create_tag(None,
                                           foreground=Common.gui.user_color,
                                           weight=pango.WEIGHT_BOLD))
             textbuffer.insert(enditer, ' ')
             # Insert the tweet proper.
-            text = re.sub('[ \n\r\b\f\0]+', ' ', self.status.text)
+            text = re.sub('[ \n\r\b\f\0]+', ' ', status.text)
             pattern = ('https?://[-_a-zA-Z0-9%./?&=#]+'
                        '|@[^ :,]+'
                        '|\\#[a-zA-Z][a-zA-Z0-9]+'
@@ -119,33 +132,77 @@ class Tweet(Strip):
             textbuffer.insert(enditer, '\n')
             textbuffer.insert_with_tags(
                     enditer,
-                    transform_stamp(self.status.created_at),
+                    transform_stamp(status.created_at),
                     textbuffer.create_tag(None,
                                           #size=pango.SCALE_SMALL,
                                           foreground="gray50"))
             textbuffer.insert(enditer, ', ')
             textbuffer.insert_with_tags(
                     enditer,
-                    self.status.source,
+                    status.source,
                     textbuffer.create_tag(None,
                                           #size=pango.SCALE_SMALL,
                                           style=pango.STYLE_ITALIC,
                                           foreground="gray50"))
             return textview
 
+        status = self.strip.status
+
         hbox = gtk.HBox()
         hbox.pack_start(image(), False, False, Common.gui.spacing)
-        hbox.pack_start(tweet())
-
         eventbox = gtk.EventBox()
         eventbox.add(hbox)
         eventbox.connect('button-press-event', self.tweet_clicked)
-        eventbox.show_all()
-        return eventbox
+        self.eventbox_widget = eventbox
+
+        vbox = gtk.VBox()
+        vbox.pack_start(eventbox, False, False)
+
+        hbox = gtk.HBox()
+        hbox.pack_start(vbox, False, False)
+        hbox.pack_start(tweet())
+        hbox.show_all()
+        self.widget = hbox
 
     def tweet_clicked(self, widget, event):
-        #print "Click", repr(self.status.text)
-        pass
+        self.toggle_select()
+
+    def select(self):
+        if not self.selected:
+            Strip_in_tab.select(self)
+            self.eventbox_widget.modify_bg(
+                gtk.STATE_NORMAL,
+                self.eventbox_widget.get_colormap().alloc_color(
+                    Common.gui.select_color))
+
+    def unselect(self):
+        if self.selected:
+            Strip_in_tab.unselect(self)
+            self.eventbox_widget.modify_bg(
+                gtk.STATE_NORMAL,
+                self.eventbox_widget.get_colormap().alloc_color('white'))
+
+class Tweet(Strip):
+    in_tab_maker = Tweet_in_tab
+
+    def __init__(self, status):
+        self.status = status
+        Strip.__init__(self, status.id)
+
+class User_in_tab(Strip_in_tab):
+
+    def create_widget(self):
+        hbox = gtk.HBox()
+        button = gtk.Button('☺')
+        hbox.pack_start(button, False, False, Common.gui.spacing)
+        label = gtk.Label(str(self.strip))
+        label.set_line_wrap(True)
+        hbox.pack_start(label, False, False)
+        hbox.show_all()
+        self.widget = hbox
+
+class User(Strip):
+    in_tab_maker = User_in_tab
 
 ## Text services.
 
