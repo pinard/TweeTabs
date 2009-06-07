@@ -97,8 +97,15 @@ class Main:
                 context['delay'] = Common.gui.delay
                 execfile(self.configdir + '/tabsetup.py', context, {})
             else:
-                tab = Tab.Friends_timeline()
-                tab.set_name("Friends")
+                user = Tab.User_timeline()
+                user.hide()
+                replies = Tab.Replies_timeline()
+                replies.hide()
+                me = Tab.Union(user, replies)
+                me.set_name("Me…")
+                friends = Tab.Friends_timeline()
+                friends.set_name("Friends")
+                user.goto()
 
         # Start the Twitter manager (first), then the GUI.
         if Common.threaded:

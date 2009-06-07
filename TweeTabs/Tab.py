@@ -133,11 +133,16 @@ class Tab:
 
     def hide(self):
         if not self.hidden:
+            page = Common.gui.notebook_widget.page_num(self.widget)
+            assert page >= 0, self
+            Common.gui.notebook_widget.remove_page(page)
             self.undisplay_strips(self.strips)
             self.hidden = True
 
     def unhide(self):
         if self.hidden:
+            Common.gui.notebook_widget.append_page(self.widget, gtk.Label())
+            Common.gui.notebook_widget.set_tab_reorderable(self.widget, True)
             self.display_strips(self.strips)
             self.hidden = False
 
