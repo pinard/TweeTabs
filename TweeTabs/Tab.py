@@ -50,7 +50,7 @@ class Tab:
         self.deleted = set()
         self.outputs = set()
         self.strips = set()
-        self.strip_in_tab = {}
+        self.visible_strip = {}
         self.create_widget()
         if self.base is not None:
             self.set_name(self.base)
@@ -201,15 +201,15 @@ class Tab:
 
     def display_strips(self, strips):
         for strip in sorted(strips):
-            strip_in_tab = strip.in_tab_maker(self, strip)
-            self.strip_in_tab[strip] = strip_in_tab
-            self.tab_vbox.pack_start(strip_in_tab.widget, False, False)
+            visible_strip = strip.visible_maker(self, strip)
+            self.visible_strip[strip] = visible_strip
+            self.tab_vbox.pack_start(visible_strip.widget, False, False)
         self.update_tab_label()
 
     def undisplay_strips(self, strips):
         for strip in strips:
-            self.tab_vbox.remove(self.strip_in_tab[strip].widget)
-            del self.strip_in_tab[strip]
+            self.tab_vbox.remove(self.visible_strip[strip].widget)
+            del self.visible_strip[strip]
         self.update_tab_label()
 
     def create_widget(self):

@@ -29,7 +29,15 @@ import Common
 image_size = 60
 image_loader_capacity = 800
 
-class Strip_in_tab:
+# Here is the distinction between a strip and a visible strip.  A strip
+# is the genuine object as included in sets, so we can do set operations.
+# A widget may not have more than one parent, but the same logical strip
+# may well appear in many tabs.  Moreover, a strip may be selected in a tab
+# and unselected in another.  For these reasons, a visible object is really
+# a strip as within a particular tab.  For each strip sub-type, there is a
+# corresponding visible strip sub-type.
+
+class Visible_strip:
     selected = False
 
     def __init__(self, tab, strip):
@@ -56,7 +64,7 @@ class Strip_in_tab:
             self.select()
 
 class Strip:
-    in_tab_maker = Strip_in_tab
+    visible_maker = Visible_strip
 
     def __init__(self, key):
         self.key = key
@@ -70,7 +78,7 @@ class Strip:
     def __hash__(self):
         return hash(self.key)
 
-class Tweet_in_tab(Strip_in_tab):
+class Visible_tweet(Visible_strip):
 
     def create_widget(self):
 
@@ -169,7 +177,7 @@ class Tweet_in_tab(Strip_in_tab):
 
     def select(self):
         if not self.selected:
-            Strip_in_tab.select(self)
+            Visible_strip.select(self)
             self.eventbox_widget.modify_bg(
                 gtk.STATE_NORMAL,
                 self.eventbox_widget.get_colormap().alloc_color(
@@ -177,19 +185,19 @@ class Tweet_in_tab(Strip_in_tab):
 
     def unselect(self):
         if self.selected:
-            Strip_in_tab.unselect(self)
+            Visible_strip.unselect(self)
             self.eventbox_widget.modify_bg(
                 gtk.STATE_NORMAL,
                 self.eventbox_widget.get_colormap().alloc_color('white'))
 
 class Tweet(Strip):
-    in_tab_maker = Tweet_in_tab
+    visible_maker = Visible_tweet
 
     def __init__(self, status):
         self.status = status
         Strip.__init__(self, status.id)
 
-class User_in_tab(Strip_in_tab):
+class Visible_user(Visible_strip):
 
     def create_widget(self):
         hbox = gtk.HBox()
@@ -202,7 +210,7 @@ class User_in_tab(Strip_in_tab):
         self.widget = hbox
 
 class User(Strip):
-    in_tab_maker = User_in_tab
+    visible_maker = Visible_user
 
 ## Text services.
 
@@ -275,28 +283,31 @@ class Image_loader:
                 image.set_from_pixbuf(pixbuf)
 
     def pixbuf_from_url(self, url):
-        # Get the image.
-        if self.db.has_key(url):
-            buffer = self.db[url]
+        url8 = url.encode('UTF-8')
+        # Get the raw image, either from our cache or from the Web.
+        if self.db.has_key(url8):
+            buffer = self.db[url8]
         else:
             try:
-                buffer = urllib.urlopen(url).read()
-            except UnicodeError:
+                buffer = urllib.urlopen(url8).read()
+            except IOError:
                 try:
-                    buffer = urllib.urlopen(url.encode('ISO-8859-1')).read()
+                    url1 = url.encode('ISO-8859-1')
                 except UnicodeError:
-                    try:
-                        buffer = urllib.urlopen(url.encode('UTF-8')).read()
-                    except UnicodeError:
-                        return self.empty_pixbuf
-            self.db[url] = buffer
+                    return self.empty_pixbuf
+                try:
+                    buffer = urllib.urlopen(url1).read()
+                except IOError:
+                    return self.empty_pixbuf
+            self.db[url8] = buffer
+        # Transform it into a PIL image.
         try:
             im = PIL.Image.open(StringIO.StringIO(buffer))
         except IOError:
             return self.empty_pixbuf
         if im.mode != 'RGB':
             im = im.convert('RGB')
-        # Make it square, keeping the center.
+        # Make it square and resize it, keeping the same center.
         sx, sy = im.size
         if sx > sy:
             extra = (sx - sy) // 2
@@ -304,8 +315,8 @@ class Image_loader:
         elif sy > sx:
             extra = (sy - sx) // 2
             im = im.crop((0, extra, sx, extra + sx))
-        # Resize it.
         im = im.resize((image_size, image_size), PIL.Image.ANTIALIAS)
+        # Transform the result into a pixbuf.
         return self.pixbuf_from_pil(im)
 
     def pixbuf_from_pil(self, im):

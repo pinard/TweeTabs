@@ -308,14 +308,14 @@ class Gui:
     @callback
     def strip_select_clear_all_cb(self, action):
         tab = self.current_tab()
-        for strip_in_tab in tab.strip_in_tab.itervalues():
-            strip_in_tab.unselect()
+        for visible_strip in tab.visible_strip.itervalues():
+            visible_strip.unselect()
 
     @callback
     def strip_select_inverse_cb(self, action):
         tab = self.current_tab()
-        for strip_in_tab in tab.strip_in_tab.itervalues():
-            strip_in_tab.toggle_select()
+        for visible_strip in tab.visible_strip.itervalues():
+            visible_strip.toggle_select()
 
     @callback
     def tab_compose_added_cb(self, action):
