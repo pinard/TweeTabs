@@ -22,7 +22,8 @@ A Twitter reader and personal manager - Strip structures.
 """
 
 __metaclass__ = type
-import PIL.Image, StringIO, anydbm, atexit, gtk, pango, re, sys, time, urllib
+import StringIO, anydbm, atexit, gtk, pango, re, simplejson, sys, time, urllib
+import PIL.Image, twyt.data
 
 import Common
 
@@ -131,8 +132,8 @@ class Visible_tweet(Visible_strip):
                 else: # http:// or https://
                     tag = textbuffer.create_tag(
                             None,
-                            underline=pango.UNDERLINE_SINGLE,
-                            foreground=Common.gui.url_color)
+                            foreground=Common.gui.url_color,
+                            underline=pango.UNDERLINE_SINGLE)
                 textbuffer.insert_with_tags(enditer, match.group(), tag)
                 position = match.end()
             textbuffer.insert(enditer, text[position:])
@@ -160,7 +161,7 @@ class Visible_tweet(Visible_strip):
         hbox.pack_start(image(), False, False, Common.gui.spacing)
         eventbox = gtk.EventBox()
         eventbox.add(hbox)
-        eventbox.connect('button-press-event', self.tweet_clicked)
+        eventbox.connect('button-press-event', self.image_clicked)
         self.eventbox_widget = eventbox
 
         vbox = gtk.VBox()
@@ -172,7 +173,7 @@ class Visible_tweet(Visible_strip):
         hbox.show_all()
         self.widget = hbox
 
-    def tweet_clicked(self, widget, event):
+    def image_clicked(self, widget, event):
         self.toggle_select()
 
     def select(self):
@@ -209,8 +210,85 @@ class Visible_user(Visible_strip):
         hbox.show_all()
         self.widget = hbox
 
+    def create_widget(self):
+
+        def image():
+            vbox = gtk.VBox()
+            image = gtk.Image()
+            image_loader.load(image, user.profile_image_url)
+            vbox.pack_start(image, False, False)
+            return vbox
+
+        def description():
+            # Prepare the display.
+            textview = gtk.TextView()
+            textview.set_editable(False)
+            textview.set_cursor_visible(False)
+            textview.set_wrap_mode(gtk.WRAP_WORD)
+            textbuffer = textview.get_buffer()
+            enditer = textbuffer.get_end_iter()
+            # Insert the user name.
+            textbuffer.insert_with_tags(
+                    enditer,
+                    user.screen_name + ':',
+                    textbuffer.create_tag(None,
+                                          foreground=Common.gui.user_color,
+                                          weight=pango.WEIGHT_BOLD))
+            # Insert the rest of information.
+            textbuffer.insert(
+                    enditer,
+                    ' ' + user.name + ' [' + user.location + '] '
+                    + user.description + ' ')
+            textbuffer.insert_with_tags(
+                    enditer, user.url or "http://unknown",
+                    textbuffer.create_tag(
+                        None,
+                        foreground=Common.gui.url_color,
+                        underline=pango.UNDERLINE_SINGLE))
+            return textview
+
+        user = self.strip.user
+
+        hbox = gtk.HBox()
+        hbox.pack_start(image(), False, False, Common.gui.spacing)
+        eventbox = gtk.EventBox()
+        eventbox.add(hbox)
+        eventbox.connect('button-press-event', self.image_clicked)
+        self.eventbox_widget = eventbox
+
+        vbox = gtk.VBox()
+        vbox.pack_start(eventbox, False, False)
+
+        hbox = gtk.HBox()
+        hbox.pack_start(vbox, False, False)
+        hbox.pack_start(description())
+        hbox.show_all()
+        self.widget = hbox
+
+    def image_clicked(self, widget, event):
+        self.toggle_select()
+
+    def select(self):
+        if not self.selected:
+            Visible_strip.select(self)
+            self.eventbox_widget.modify_bg(
+                gtk.STATE_NORMAL,
+                self.eventbox_widget.get_colormap().alloc_color(
+                    Common.gui.select_color))
+
+    def unselect(self):
+        if self.selected:
+            Visible_strip.unselect(self)
+            self.eventbox_widget.modify_bg(
+                gtk.STATE_NORMAL,
+                self.eventbox_widget.get_colormap().alloc_color('white'))
+
 class User(Strip):
     visible_maker = Visible_user
+
+    def __init__(self, id):
+        self.user = user_loader.load(id)
+        Strip.__init__(self, id)
 
 ## Text services.
 
@@ -230,6 +308,38 @@ def transform_stamp(stamp):
         stamp = '%s-%.2d-%s %s GMT' % (
                 year, monthname_to_month[monthname], day, clock[:5])
     return stamp
+
+## User services.
+
+class User_loader:
+
+    def __init__(self):
+        # A local database containing user descriptions, indexed by both id
+        # and screen name.
+        self.db = anydbm.open(Common.configdir + '/user-cache', 'c')
+        atexit.register(self.db.close)
+
+    def load(self, id):
+        id_string = str(id)
+        if self.db.has_key(id_string):
+            user = simplejson.loads(self.db[id_string])
+        else:
+            Common.gui.delay(None, Common.manager.get_user_info, id,
+                             self.get_user_info_callback)
+            user = {'id': id_string,
+                    'name': "Name " + id_string,
+                    'screen_name': "Id " + id_string,
+                    'location': "unknown",
+                    'description': "Description " + id_string,
+                    'profile_image_url': None,
+                    'url': None,
+                    'protected': False}
+        return twyt.data.User(user)
+
+    def get_user_info_callback(self, id, info):
+        self.db[str(id)] = info
+
+user_loader = User_loader()
 
 ## Image services.
 
@@ -255,6 +365,10 @@ class Image_loader:
     def load(self, image, url):
         # Load the GTK image from the given URL.  If not available yet,
         # then load an empty image now and manage for the real image later.
+        if url is None:
+            # This happens for user strips.  Just punt for now.
+            image.set_from_pixbuf(self.empty_pixbuf)
+            return
         if url in self.cache:
             pixbuf, images = self.cache[url]
             if pixbuf is None:

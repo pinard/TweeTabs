@@ -22,15 +22,12 @@ A Twitter reader and personal manager - Twitter API management.
 """
 
 __metaclass__ = type
-import gobject, os, sys
-
-import simplejson
-from twyt.twitter import Twitter, TwitterException
-from twyt.data import RateLimit, Status, StatusList
+import gobject, os, simplejson, sys
+import twyt.twitter, twyt.data
 
 import Common, Strip
 
-twitter = Twitter()
+twitter = twyt.twitter.Twitter()
 
 # Set these from your ~/.tweetabs/defaults.py file, rather than here.
 user = None
@@ -51,7 +48,7 @@ class twytcall:
             self.message(this.message + '…')
             try:
                 return func(self, *args, **kws)
-            except TwitterException, exception:
+            except twyt.twitter.TwitterException, exception:
                 self.error(str(exception) + ', ' + this.message)
             finally:
                 self.message('')
@@ -59,8 +56,8 @@ class twytcall:
         return decorated
 
 class Manager:
-    auth_limit = None
-    ip_limit = None
+    auth_limit = 100
+    ip_limit = 100
     blanker_active = False
 
     def __init__(self):
@@ -71,7 +68,7 @@ class Manager:
     def start(self):
         pass
 
-    def suggested_deltas(self, delayed_events):
+    def suggested_delta(self, delayed_events):
         limit = max(0, min(100, self.auth_limit - len(delayed_events)))
         return suggested_deltas[(100 - limit) // 10]
 
@@ -107,14 +104,14 @@ class Manager:
 
     @twytcall("getting Auth limit")
     def get_auth_limit(self):
-        response = RateLimit(twitter.account_rate_limit_status(True))
+        response = twyt.data.RateLimit(twitter.account_rate_limit_status(True))
         self.auth_limit = response['remaining_hits']
         self.display_limits()
         return True
 
     @twytcall("getting IP limit")
     def get_ip_limit(self):
-        response = RateLimit(twitter.account_rate_limit_status(False))
+        response = twyt.data.RateLimit(twitter.account_rate_limit_status(False))
         self.ip_limit = response['remaining_hits']
         self.display_limits()
         return True
@@ -135,18 +132,23 @@ class Manager:
         tab.refresh()
         return True
 
+    @twytcall("getting user info")
+    def get_user_info(self, id, callback):
+        callback(id, twitter.user_show(id))
+        return True
+
     @twytcall("loading direct timeline")
     def load_direct_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            StatusList(twitter.direct_messages())))
+            twyt.data.StatusList(twitter.direct_messages())))
         tab.refresh()
         return True
 
     @twytcall("loading direct sent timeline")
     def load_direct_sent_timeline(self, tab):
         tab.preset_strips |= set(map(
-            Strip.Tweet, StatusList(twitter.direct_sent())))
+            Strip.Tweet, twyt.data.StatusList(twitter.direct_sent())))
         tab.refresh()
         return True
 
@@ -154,7 +156,7 @@ class Manager:
     def load_friends_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            StatusList(twitter.status_friends_timeline())))
+            twyt.data.StatusList(twitter.status_friends_timeline())))
         tab.refresh()
         return True
 
@@ -162,7 +164,7 @@ class Manager:
     def load_public_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            StatusList(twitter.status_public_timeline())))
+            twyt.data.StatusList(twitter.status_public_timeline())))
         tab.refresh()
         return True
 
@@ -170,7 +172,7 @@ class Manager:
     def load_replies_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            StatusList(twitter.status_replies())))
+            twyt.data.StatusList(twitter.status_replies())))
         tab.refresh()
         return True
 
@@ -178,7 +180,7 @@ class Manager:
     def load_user_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            StatusList(twitter.status_user_timeline())))
+            twyt.data.StatusList(twitter.status_user_timeline())))
         tab.refresh()
         return True
 
