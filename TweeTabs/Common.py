@@ -29,6 +29,9 @@ pygtk.require('2.0')
 class Error(Exception):
     pass
 
+# The TweeTabs configuration directory, patched in from Main.
+configdir = None
+
 # If threading should be used, patched in from Main.
 threaded = False
 

@@ -22,7 +22,7 @@ A Twitter reader and personal manager - Strip structures.
 """
 
 __metaclass__ = type
-import PIL.Image, StringIO, gtk, pango, re, sys, time, urllib
+import PIL.Image, StringIO, anydbm, atexit, gtk, pango, re, sys, time, urllib
 
 import Common
 
@@ -225,52 +225,17 @@ def transform_stamp(stamp):
 
 ## Image services.
 
-def pixbuf_from_url(url):
-    # Get the image.
-    try:
-        buffer = urllib.urlopen(url).read()
-    except UnicodeError:
-        try:
-            buffer = urllib.urlopen(url.encode('ISO-8859-1')).read()
-        except UnicodeError:
-            try:
-                buffer = urllib.urlopen(url.encode('UTF-8')).read()
-            except UnicodeError:
-                return empty_pixbuf
-    try:
-        im = PIL.Image.open(StringIO.StringIO(buffer))
-    except IOError:
-        return empty_pixbuf
-    if im.mode != 'RGB':
-        im = im.convert('RGB')
-    # Make it square, keeping the center.
-    sx, sy = im.size
-    if sx > sy:
-        extra = (sx - sy) // 2
-        im = im.crop((extra, 0, extra + sy, sy))
-    elif sy > sx:
-        extra = (sy - sx) // 2
-        im = im.crop((0, extra, sx, extra + sx))
-    # Resize it.
-    im = im.resize((image_size, image_size), PIL.Image.ANTIALIAS)
-    return pixbuf_from_pil(im)
-
-def pixbuf_from_pil(im):
-    handle = StringIO.StringIO()
-    im.save(handle, 'ppm')
-    buffer = handle.getvalue()
-    loader = gtk.gdk.PixbufLoader('pnm')
-    loader.write(buffer, len(buffer))
-    pixbuf = loader.get_pixbuf()
-    loader.close()
-    return pixbuf
-
-empty_pixbuf = pixbuf_from_pil(
-        PIL.Image.new('RGB', (image_size, image_size), (255, 255, 255)))
-
 class Image_loader:
 
     def __init__(self):
+        # An empty, white image is used until we get the real one.
+        self.empty_pixbuf = self.pixbuf_from_pil(PIL.Image.new(
+            'RGB', (image_size, image_size), (255, 255, 255)))
+        # A local database containing images, indexed by URLs.  We go to the
+        # Web only when the image is not found within the database, and save
+        # any obtained image within the database.
+        self.db = anydbm.open(Common.configdir + '/image-cache', 'c')
+        atexit.register(self.db.close)
         # From URL to (Pixbuf, Images).  Pixbuf is None when Pixbuf is not
         # known.  Images is a list of GTK images waiting for that URL, or None
         # after the loading has completed.  (None, None) is a way to remember
@@ -287,12 +252,12 @@ class Image_loader:
             if pixbuf is None:
                 if images is not None:
                     images.append(image)
-                pixbuf = empty_pixbuf
+                pixbuf = self.empty_pixbuf
             image.set_from_pixbuf(pixbuf)
             self.lru.remove(url)
             self.lru.append(url)
             return
-        image.set_from_pixbuf(empty_pixbuf)
+        image.set_from_pixbuf(self.empty_pixbuf)
         self.cache[url] = None, [image]
         Common.gui.delay(0, self.delayed_load, url)
         self.lru.append(url)
@@ -302,11 +267,55 @@ class Image_loader:
     def delayed_load(self, url):
         # Load an image from an URL and spread it on all strips where it is
         # already expected.
-        pixbuf = pixbuf_from_url(url)
+        pixbuf = self.pixbuf_from_url(url)
         if url in self.cache:
             images = self.cache[url][1]
             self.cache[url] = pixbuf, None
             for image in images:
                 image.set_from_pixbuf(pixbuf)
+
+    def pixbuf_from_url(self, url):
+        # Get the image.
+        if self.db.has_key(url):
+            buffer = self.db[url]
+        else:
+            try:
+                buffer = urllib.urlopen(url).read()
+            except UnicodeError:
+                try:
+                    buffer = urllib.urlopen(url.encode('ISO-8859-1')).read()
+                except UnicodeError:
+                    try:
+                        buffer = urllib.urlopen(url.encode('UTF-8')).read()
+                    except UnicodeError:
+                        return self.empty_pixbuf
+            self.db[url] = buffer
+        try:
+            im = PIL.Image.open(StringIO.StringIO(buffer))
+        except IOError:
+            return self.empty_pixbuf
+        if im.mode != 'RGB':
+            im = im.convert('RGB')
+        # Make it square, keeping the center.
+        sx, sy = im.size
+        if sx > sy:
+            extra = (sx - sy) // 2
+            im = im.crop((extra, 0, extra + sy, sy))
+        elif sy > sx:
+            extra = (sy - sx) // 2
+            im = im.crop((0, extra, sx, extra + sx))
+        # Resize it.
+        im = im.resize((image_size, image_size), PIL.Image.ANTIALIAS)
+        return self.pixbuf_from_pil(im)
+
+    def pixbuf_from_pil(self, im):
+        handle = StringIO.StringIO()
+        im.save(handle, 'ppm')
+        buffer = handle.getvalue()
+        loader = gtk.gdk.PixbufLoader('pnm')
+        loader.write(buffer, len(buffer))
+        pixbuf = loader.get_pixbuf()
+        loader.close()
+        return pixbuf
 
 image_loader = Image_loader()

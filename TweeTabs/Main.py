@@ -37,11 +37,12 @@ Debugging options:
 __metaclass__ = type
 import gobject, gtk, os, sys
 
-import Common, Gui, Strip, Tab
+import Common
 
 class Main:
-    configdir = os.path.expanduser('~/.tweetabs')
     initial_tabsetup = True
+    geometry = None
+    read_only_mode = None
 
     def main(self, *arguments):
 
@@ -50,31 +51,38 @@ class Main:
         options, arguments = getopt.getopt(arguments, 'c:hig:nrt')
         for option, value in options:
             if option == '-c':
-                self.configdir = value
+                Common.configdir = value
             elif option == '-h':
                 sys.stdout.write(__doc__)
                 return
             elif option == '-i':
                 os.putenv('PYTHONINSPECT', '1')
             elif option == '-g':
-                width, height = map(int, value.split('x'))
-                Gui.Gui.minimum_width = width
-                Gui.Gui.minimum_height = height
+                self.geometry = value
             elif option == '-n':
                 self.initial_tabsetup = False
             elif option == '-r':
-                Gui.Gui.read_only_mode = True
+                self.read_only_mode = True
             elif option == '-t':
                 Common.threaded = True
+        if Common.configdir is None:
+            Common.configdir = os.path.expanduser('~/.tweetabs')
 
         # Should only be imported after option decoding.
-        global Manager
-        import Manager
+        import Gui, Manager, Strip, Tab
+
+        # Push some options into Gui.
+        if self.geometry is not None:
+            width, height = map(int, self.geometry.split('x'))
+            Gui.Gui.minimum_width = width
+            Gui.Gui.minimum_height = height
+        if self.read_only_mode is not None:
+            Gui.Gui.read_only_mode = True
 
         # Read in default initialization as set by user.
-        if os.path.exists(self.configdir + '/defaults.py'):
+        if os.path.exists(Common.configdir + '/defaults.py'):
             context = {'Gui': Gui.Gui, 'Strip': Strip, 'Twitter': Manager}
-            execfile(self.configdir + '/defaults.py', context, {})
+            execfile(Common.configdir + '/defaults.py', context, {})
         if Manager.user is None or Manager.password is None:
             sys.exit("Twitter user not set, set it in your defaults.py file.")
 
@@ -91,11 +99,11 @@ class Main:
 
         # Read in initial tab setup as set by user.
         if self.initial_tabsetup:
-            if os.path.exists(self.configdir + '/tabsetup.py'):
+            if os.path.exists(Common.configdir + '/tabsetup.py'):
                 context = dict(Tab.__dict__)
-                context['configdir'] = self.configdir
+                context['configdir'] = Common.configdir
                 context['delay'] = Common.gui.delay
-                execfile(self.configdir + '/tabsetup.py', context, {})
+                execfile(Common.configdir + '/tabsetup.py', context, {})
             else:
                 user = Tab.User_timeline()
                 user.hide()
