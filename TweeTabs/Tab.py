@@ -34,8 +34,9 @@ class Error(Common.Error):
 class Tab:
     ordinal = 0
     registry = {}
-    base = None
+    name_base = None
     name = None
+    strip_type = None
     frozen = False
     hidden = False
     # Values are False, True and 2 (another True for complement sets)
@@ -52,11 +53,11 @@ class Tab:
         self.strips = set()
         self.visible_strip = {}
         self.create_widget()
-        if self.base is not None:
-            self.set_name(self.base)
+        if self.name_base is not None:
+            self.set_name(self.name_base)
         self.freeze()
         for input in inputs:
-            input.add_output(self)
+            self.add_input(input)
         self.unfreeze()
         self.goto()
 
@@ -75,16 +76,16 @@ class Tab:
             if name in Tab.registry:
                 match = re.match('(.*)([0-9]+)$', name)
                 if match:
-                    base = match.group(1)
+                    name_base = match.group(1)
                     counter = int(match.group(2))
                 else:
-                    base = name
+                    name_base = name
                     counter = 1
                 counter += 1
-                name = base + str(counter)
+                name = name_base + str(counter)
                 while name in Tab.registry:
                     counter += 1
-                    name = base + str(counter)
+                    name = name_base + str(counter)
             self.name = name
             Tab.registry[name] = self
         self.name = name
@@ -147,6 +148,11 @@ class Tab:
             self.hidden = False
 
     def add_input(self, tab):
+        if self.strip_type is None:
+            self.strip_type = tab.strip_type
+        elif not issubclass(tab.strip_type, self.strip_type):
+            raise Error("%s is not made of %s strips"
+                        % (tab, self.strip_type.__name__))
         tab.add_output(self)
 
     def discard_input(self, tab):
@@ -289,7 +295,7 @@ class Periodic(Preset):
         Preset.refresh(self)
 
 class Union(Tab):
-    base = 'Union'
+    name_base = 'Union'
 
     def recomputed_strips(self):
         strips = set()
@@ -328,7 +334,7 @@ class Closeable(Union):
 ## Final types.
 
 class Difference(Tab):
-    base = 'Diff'
+    name_base = 'Diff'
 
     def add_output(self, tab):
         negative = set(self.inputs[1:])
@@ -359,35 +365,42 @@ class Difference(Tab):
         return strips
 
 class Direct_timeline(Periodic):
-    base = 'Direct'
+    strip_type = Strip.Tweet
+    name_base = 'Direct'
     period = 3 * 60
 
     def reload(self):
         return Common.manager.load_direct_timeline(self)
 
 class Direct_sent_timeline(Periodic):
-    base = 'DSent'
+    strip_type = Strip.Tweet
+    name_base = 'DSent'
     period = 60 * 60
 
     def reload(self):
         return Common.manager.load_direct_sent_timeline(self)
 
 class Followers(Periodic):
-    base = '…ers'
+    strip_type = Strip.User
+    name_base = '…ers'
+    capacity = None
     period = 60 * 60
 
     def reload(self):
         return Common.manager.fetch_followers(self)
 
 class Following(Periodic):
-    base = '…ing'
+    strip_type = Strip.User
+    name_base = '…ing'
+    capacity = None
     period = 60 * 60
 
     def reload(self):
         return Common.manager.fetch_following(self)
 
 class Friends_timeline(Periodic):
-    base = 'Friends'
+    strip_type = Strip.Tweet
+    name_base = 'Friends'
     period = 10 * 60
 
     def reload(self):
@@ -434,7 +447,7 @@ class Interactive(Tab):
         return strips & self.preset_strips
 
 class Intersection(Tab):
-    base = 'Inter'
+    name_base = 'Inter'
 
     def recomputed_strips(self):
         strips = set()
@@ -450,25 +463,28 @@ class Intersection(Tab):
         return strips
 
 class Public_timeline(Periodic):
-    base = 'Public'
+    strip_type = Strip.Tweet
+    name_base = 'Public'
     period = 2 * 60
 
     def reload(self):
         return Common.manager.load_public_timeline(self)
 
 class Replies_timeline(Periodic):
-    base = 'Replies'
+    strip_type = Strip.Tweet
+    name_base = 'Replies'
     period = 2 * 60
 
     def reload(self):
         return Common.manager.load_replies_timeline(self)
 
 class User_timeline(Periodic):
+    strip_type = Strip.Tweet
     period = 4 * 60
 
     def __init__(self):
         import Manager
-        self.base = Manager.user.capitalize()
+        self.name_base = Manager.user.capitalize()
         Periodic.__init__(self)
 
     def reload(self):
