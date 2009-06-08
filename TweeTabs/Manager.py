@@ -22,10 +22,13 @@ A Twitter reader and personal manager - Twitter API management.
 """
 
 __metaclass__ = type
-import gobject, os, simplejson, sys
+import gobject, os, random, simplejson, sys
 import twyt.twitter, twyt.data
 
 import Common, Strip
+
+class Error(Common.Error):
+    pass
 
 twitter = twyt.twitter.Twitter()
 
@@ -33,9 +36,6 @@ twitter = twyt.twitter.Twitter()
 user = None
 password = None
 blanking_delay = 4
-
-#                100 90 80 70 60 50  40  30  20  10   0
-suggested_deltas = 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89
 
 class twytcall:
 
@@ -49,28 +49,63 @@ class twytcall:
             try:
                 return func(self, *args, **kws)
             except twyt.twitter.TwitterException, exception:
-                self.error(str(exception) + ', ' + this.message)
+                diagnostic = str(exception) + ', ' + this.message
+                self.error(diagnostic)
+                raise Error(diagnostic)
             finally:
                 self.message('')
 
         return decorated
 
 class Manager:
-    auth_limit = 100
-    ip_limit = 100
+    auth_limit = 50
+    ip_limit = 50
     blanker_active = False
+    within_delay_loop = False
 
     def __init__(self):
         twitter.set_user_agent("TweeTabs")
         twitter.set_auth(user, password)
         self.error_list = []
+        self.delayed_iterators = []
+        self.create_deltas()
 
     def start(self):
         pass
 
-    def suggested_delta(self, delayed_events):
-        limit = max(0, min(100, self.auth_limit - len(delayed_events)))
-        return suggested_deltas[(100 - limit) // 10]
+    def delay(self, iterator):
+        self.delayed_iterators.append(iterator)
+        if not self.within_delay_loop and len(self.delayed_iterators) == 1:
+            gobject.timeout_add(self.suggested_delta(), self.delay_loop)
+
+    def delay_loop(self):
+        self.within_delay_loop = True
+        pick = random.randint(0, len(self.delayed_iterators) - 1) 
+        iterator = self.delayed_iterators.pop(pick)
+        try:
+            postponer = iterator()
+        except StopIteration:
+            pass
+        else:
+            if postponer is not None:
+                postponer(iterator)
+        self.auth_limit -= 1
+        if self.delayed_iterators:
+            gobject.timeout_add(self.suggested_delta(), self.delay_loop)
+        self.within_delay_loop = False
+
+    def create_deltas(self):
+        a = 0
+        b = 1
+        deltas = []
+        while len(deltas) < 11 or b < 30 * 60:
+            a, b = b, a + b
+            deltas.append(a)
+        self.deltas = deltas[-11:]
+
+    def suggested_delta(self):
+        limit = max(0, min(100, self.auth_limit))
+        return 1000 * self.deltas[(100 - limit) // 10]
 
     def message(self, message=None):
         if message:
@@ -107,14 +142,12 @@ class Manager:
         response = twyt.data.RateLimit(twitter.account_rate_limit_status(True))
         self.auth_limit = response['remaining_hits']
         self.display_limits()
-        return True
 
     @twytcall("getting IP limit")
     def get_ip_limit(self):
         response = twyt.data.RateLimit(twitter.account_rate_limit_status(False))
         self.ip_limit = response['remaining_hits']
         self.display_limits()
-        return True
 
     @twytcall("fetching followers")
     def fetch_followers(self, tab):
@@ -122,7 +155,6 @@ class Manager:
             Strip.User,
             simplejson.loads(twitter.social_graph_followers_ids())))
         tab.refresh()
-        return True
 
     @twytcall("fetching following")
     def fetch_following(self, tab):
@@ -130,12 +162,10 @@ class Manager:
             Strip.User,
             simplejson.loads(twitter.social_graph_friends_ids())))
         tab.refresh()
-        return True
 
     @twytcall("getting user info")
-    def get_user_info(self, id, callback):
-        callback(id, twitter.user_show(id))
-        return True
+    def get_user_info(self, id):
+        return twitter.user_show(id)
 
     @twytcall("loading direct timeline")
     def load_direct_timeline(self, tab):
@@ -143,14 +173,12 @@ class Manager:
             Strip.Tweet,
             twyt.data.StatusList(twitter.direct_messages())))
         tab.refresh()
-        return True
 
     @twytcall("loading direct sent timeline")
     def load_direct_sent_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet, twyt.data.StatusList(twitter.direct_sent())))
         tab.refresh()
-        return True
 
     @twytcall("loading friends timeline")
     def load_friends_timeline(self, tab):
@@ -158,7 +186,6 @@ class Manager:
             Strip.Tweet,
             twyt.data.StatusList(twitter.status_friends_timeline())))
         tab.refresh()
-        return True
 
     @twytcall("loading public timeline")
     def load_public_timeline(self, tab):
@@ -166,7 +193,6 @@ class Manager:
             Strip.Tweet,
             twyt.data.StatusList(twitter.status_public_timeline())))
         tab.refresh()
-        return True
 
     @twytcall("loading replies timeline")
     def load_replies_timeline(self, tab):
@@ -174,7 +200,6 @@ class Manager:
             Strip.Tweet,
             twyt.data.StatusList(twitter.status_replies())))
         tab.refresh()
-        return True
 
     @twytcall("loading user timeline")
     def load_user_timeline(self, tab):
@@ -182,12 +207,10 @@ class Manager:
             Strip.Tweet,
             twyt.data.StatusList(twitter.status_user_timeline())))
         tab.refresh()
-        return True
 
     @twytcall("sending tweet")
     def send_tweet(self, message):
         twitter.status_update(message)
-        return True
 
     ## Services.
 

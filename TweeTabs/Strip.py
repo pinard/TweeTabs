@@ -28,7 +28,7 @@ import PIL.Image, twyt.data
 import Common
 
 image_size = 60
-image_loader_capacity = 800
+image_loader_capacity = 100 
 
 # Here is the distinction between a strip and a visible strip.  A strip
 # is the genuine object as included in sets, so we can do set operations.
@@ -86,7 +86,7 @@ class Visible_tweet(Visible_strip):
         def image():
             vbox = gtk.VBox()
             image = gtk.Image()
-            image_loader.load(image, status.user.profile_image_url)
+            image_loader.load(image, status.user)
             vbox.pack_start(image, False, False)
             return vbox
 
@@ -143,16 +143,17 @@ class Visible_tweet(Visible_strip):
                     enditer,
                     transform_stamp(status.created_at),
                     textbuffer.create_tag(None,
-                                          #size=pango.SCALE_SMALL,
-                                          foreground="gray50"))
+                                          foreground='gray50',
+                                          #size=pango.SCALE_SMALL
+                                          ))
             textbuffer.insert(enditer, ', ')
             textbuffer.insert_with_tags(
                     enditer,
                     status.source,
                     textbuffer.create_tag(None,
+                                          foreground='gray50',
                                           #size=pango.SCALE_SMALL,
-                                          style=pango.STYLE_ITALIC,
-                                          foreground="gray50"))
+                                          style=pango.STYLE_ITALIC))
             return textview
 
         status = self.strip.status
@@ -215,7 +216,7 @@ class Visible_user(Visible_strip):
         def image():
             vbox = gtk.VBox()
             image = gtk.Image()
-            image_loader.load(image, user.profile_image_url)
+            image_loader.load(image, user)
             vbox.pack_start(image, False, False)
             return vbox
 
@@ -235,16 +236,26 @@ class Visible_user(Visible_strip):
                                           foreground=Common.gui.user_color,
                                           weight=pango.WEIGHT_BOLD))
             # Insert the rest of information.
-            textbuffer.insert(
-                    enditer,
-                    ' ' + user.name + ' [' + user.location + '] '
-                    + user.description + ' ')
-            textbuffer.insert_with_tags(
-                    enditer, user.url or "http://unknown",
-                    textbuffer.create_tag(
-                        None,
-                        foreground=Common.gui.url_color,
-                        underline=pango.UNDERLINE_SINGLE))
+            if user.name:
+                textbuffer.insert(enditer, ' ' + user.name)
+            if user.location:
+                textbuffer.insert(enditer, ' ')
+                textbuffer.insert_with_tags(
+                        enditer,
+                        user.location,
+                        textbuffer.create_tag(None,
+                                              foreground='gray50',
+                                              style=pango.STYLE_ITALIC))
+            if user.description:
+                textbuffer.insert(enditer, ' ' + user.description)
+            if user.url:
+                textbuffer.insert(enditer, ' ')
+                textbuffer.insert_with_tags(
+                        enditer,
+                        user.url,
+                        textbuffer.create_tag(None,
+                                              foreground=Common.gui.url_color,
+                                              underline=pango.UNDERLINE_SINGLE))
             return textview
 
         user = self.strip.user
@@ -288,7 +299,7 @@ class User(Strip):
 
     def __init__(self, id):
         self.user = user_loader.load(id)
-        Strip.__init__(self, id)
+        Strip.__init__(self, self.user.screen_name)
 
 ## Text services.
 
@@ -309,38 +320,6 @@ def transform_stamp(stamp):
                 year, monthname_to_month[monthname], day, clock[:5])
     return stamp
 
-## User services.
-
-class User_loader:
-
-    def __init__(self):
-        # A local database containing user descriptions, indexed by both id
-        # and screen name.
-        self.db = anydbm.open(Common.configdir + '/user-cache', 'c')
-        atexit.register(self.db.close)
-
-    def load(self, id):
-        id_string = str(id)
-        if self.db.has_key(id_string):
-            user = simplejson.loads(self.db[id_string])
-        else:
-            Common.gui.delay(None, Common.manager.get_user_info, id,
-                             self.get_user_info_callback)
-            user = {'id': id_string,
-                    'name': "Name " + id_string,
-                    'screen_name': "Id " + id_string,
-                    'location': "unknown",
-                    'description': "Description " + id_string,
-                    'profile_image_url': None,
-                    'url': None,
-                    'protected': False}
-        return twyt.data.User(user)
-
-    def get_user_info_callback(self, id, info):
-        self.db[str(id)] = info
-
-user_loader = User_loader()
-
 ## Image services.
 
 class Image_loader:
@@ -349,59 +328,60 @@ class Image_loader:
         # An empty, white image is used until we get the real one.
         self.empty_pixbuf = self.pixbuf_from_pil(PIL.Image.new(
             'RGB', (image_size, image_size), (255, 255, 255)))
-        # A local database containing images, indexed by URLs.  We go to the
+        # A local database containing images, indexed by Ids.  We go to the
         # Web only when the image is not found within the database, and save
         # any obtained image within the database.
         self.db = anydbm.open(Common.configdir + '/image-cache', 'c')
         atexit.register(self.db.close)
-        # From URL to (Pixbuf, Images).  Pixbuf is None when Pixbuf is not
-        # known.  Images is a list of GTK images waiting for that URL, or None
-        # after the loading has completed.  (None, None) is a way to remember
-        # that the image URL is invalid, and should not be loaded again.
+        # From Id to (Pixbuf, Images).  Pixbuf is None when Pixbuf is not
+        # known.  Images is a list of GTK images waiting for that Id, or
+        # None after the loading has completed.  (None, None) is to prevent
+        # load attempts, when something is permanently wrong with an Id.
         self.cache = {}
-        # The older URL at the beginning, the most recent at the end.
+        # The older Id at the beginning, the most recent at the end.
         self.lru = []
 
-    def load(self, image, url):
-        # Load the GTK image from the given URL.  If not available yet,
-        # then load an empty image now and manage for the real image later.
-        if url is None:
-            # This happens for user strips.  Just punt for now.
-            image.set_from_pixbuf(self.empty_pixbuf)
-            return
-        if url in self.cache:
-            pixbuf, images = self.cache[url]
+    def load(self, image, user):
+        # Load an empty image now, so the layout computes faster.
+        image.set_from_pixbuf(self.empty_pixbuf)
+        # Manage so the real image will replace it soon.
+        Common.gui.early(self.load_generator(image, user).next)
+
+    def load_generator(self, image, user):
+        # Load the GTK image from the user Id.
+        if user.id in self.cache:
+            pixbuf, images = self.cache[user.id]
             if pixbuf is None:
                 if images is not None:
                     images.append(image)
-                pixbuf = self.empty_pixbuf
-            image.set_from_pixbuf(pixbuf)
-            self.lru.remove(url)
-            self.lru.append(url)
+            else:
+                image.set_from_pixbuf(pixbuf)
+            self.lru.remove(user.id)
+            self.lru.append(user.id)
             return
-        image.set_from_pixbuf(self.empty_pixbuf)
-        self.cache[url] = None, [image]
-        Common.gui.delay(0, self.delayed_load, url)
-        self.lru.append(url)
+        self.cache[user.id] = None, [image]
+        self.lru.append(user.id)
         if len(self.lru) > image_loader_capacity:
             del self.cache[self.lru.pop(0)]
-
-    def delayed_load(self, url):
-        # Load an image from an URL and spread it on all strips where it is
-        # already expected.
-        pixbuf = self.pixbuf_from_url(url)
-        if url in self.cache:
-            images = self.cache[url][1]
-            self.cache[url] = pixbuf, None
+        # Spread the image on all strips where is is already expected.
+        pixbuf = self.pixbuf_from_user(user)
+        if user.id in self.cache:
+            images = self.cache[user.id][1]
+            self.cache[user.id] = pixbuf, None
             for image in images:
                 image.set_from_pixbuf(pixbuf)
+        yield None
 
-    def pixbuf_from_url(self, url):
-        url8 = url.encode('UTF-8')
-        # Get the raw image, either from our cache or from the Web.
-        if self.db.has_key(url8):
-            buffer = self.db[url8]
+    def pixbuf_from_user(self, user):
+        # Get the raw image, either from our database or from the Web.
+        id_string = str(user.id)
+        if self.db.has_key(id_string):
+            buffer = self.db[id_string]
         else:
+            url = user.profile_image_url
+            if not url:
+                return self.empty_pixbuf
+            url8 = url.encode('UTF-8')
             try:
                 buffer = urllib.urlopen(url8).read()
             except IOError:
@@ -413,7 +393,7 @@ class Image_loader:
                     buffer = urllib.urlopen(url1).read()
                 except IOError:
                     return self.empty_pixbuf
-            self.db[url8] = buffer
+            self.db[id_string] = buffer
         # Transform it into a PIL image.
         try:
             im = PIL.Image.open(StringIO.StringIO(buffer))
@@ -444,3 +424,52 @@ class Image_loader:
         return pixbuf
 
 image_loader = Image_loader()
+
+## User services.
+
+class User_loader:
+
+    def __init__(self):
+        # A local database containing user descriptions, indexed by both id
+        # and screen name.
+        self.db = anydbm.open(Common.configdir + '/user-cache', 'c')
+        atexit.register(self.db.close)
+
+    def load(self, id):
+        id_string = str(id)
+        if self.db.has_key(id_string):
+            buffer = self.db[id_string]
+            if buffer:
+                user = simplejson.loads(buffer)
+            else:
+                # Correct incorrect prior saving.
+                del self.db[id_string]
+                user = None
+        else:
+            user = None
+
+        if not user:
+
+            def generator():
+                try:
+                    buffer = Common.manager.get_user_info(id)
+                except Common.error, exception:
+                    pass
+                else:
+                    if buffer:
+                        self.db[str(id)] = buffer
+                yield None
+
+            Common.manager.delay(generator().next)
+            user = {'id': id_string,
+                    'name': '',
+                    'screen_name': id_string,
+                    'location': None,
+                    'description': None,
+                    'profile_image_url': None,
+                    'url': None,
+                    'protected': False}
+
+        return twyt.data.User(user)
+
+user_loader = User_loader()

@@ -53,6 +53,8 @@ class Gui:
     tag_color = 'darkgreen'
     url_color = 'blue'
 
+    within_delay_loop = False
+
     user_interface = '''\
 <menubar name="MenuBar">
   <menu action="File">
@@ -108,6 +110,60 @@ class Gui:
 '''
 
     def __init__(self):
+        self.delay_timeout_id = None
+        self.delayed_iterators = []
+        self.create_widget()
+      
+    def start(self):
+        self.widget.show_all()
+        self.count_widget.hide()
+        self.message('☺')
+        if Common.threaded:
+            gtk.gdk.threads_init()
+            gtk.gdk.threads_enter()
+        gtk.main()
+        if Common.threaded:
+            gtk.gdk.threads_leave()
+
+    def early(self, iterator):
+        self.delay(0, iterator)
+
+    def delay(self, delta, iterator):
+        now = time.time()
+        future = now + delta
+        heapq.heappush(self.delayed_iterators, (future, iterator))
+        if not self.within_delay_loop:
+            if self.delay_timeout_id is not None:
+                gobject.source_remove(self.delay_timeout_id)
+            delta = max(10, int(1000 * (self.delayed_iterators[0][0] - now)))
+            self.delay_timeout_id = gobject.timeout_add(delta, self.delay_loop)
+
+    def delay_loop(self):
+        self.within_delay_loop = True
+        now = time.time()
+        while self.delayed_iterators and now >= self.delayed_iterators[0][0]:
+            future, iterator = heapq.heappop(self.delayed_iterators)
+            try:
+                postponer = iterator()
+            except StopIteration:
+                pass
+            else:
+                if postponer is not None:
+                    postponer(iterator)
+            self.refresh()
+            now = time.time()
+        if self.delayed_iterators:
+            delta = max(10, int(1000 * (self.delayed_iterators[0][0] - now)))
+        else:
+            delta = 5000
+        self.delay_timeout_id = gobject.timeout_add(delta, self.delay_loop)
+        self.within_delay_loop = False
+
+    def refresh(self):
+        while gtk.events_pending():
+            gtk.main_iteration(False)
+
+    def create_widget(self):
 
         def menu_bar(window):
             manager = gtk.UIManager()
@@ -219,9 +275,6 @@ class Gui:
             hbox.pack_end(self.twitter_message_widget, False)
             return hbox
 
-        self.delay_timeout_id = None
-        self.delayed_events = []
-
         window = gtk.Window()
         window.set_title("TweeTabs")
         window.set_size_request(self.minimum_width, self.minimum_height)
@@ -236,45 +289,6 @@ class Gui:
         vbox.pack_start(entry_line(), False)
         window.add(vbox)
         self.widget = window
-      
-    def start(self):
-        self.widget.show_all()
-        self.count_widget.hide()
-        self.message('☺')
-        if Common.threaded:
-            gtk.gdk.threads_init()
-            gtk.gdk.threads_enter()
-        gtk.main()
-        if Common.threaded:
-            gtk.gdk.threads_leave()
-
-    def delay(self, delta, func, *args, **kws):
-        if self.delay_timeout_id is not None:
-            gobject.source_remove(self.delay_timeout_id)
-        if delta is None:
-            delta = Common.manager.suggested_delta(self.delayed_events)
-        now = time.time()
-        future = now + delta
-        heapq.heappush(self.delayed_events, (future, func, args, kws))
-        delta = max(10, int(1000 * (self.delayed_events[0][0] - now)))
-        self.delay_timeout_id = gobject.timeout_add(delta, self.delay_loop)
-
-    def delay_loop(self):
-        now = time.time()
-        while self.delayed_events and now >= self.delayed_events[0][0]:
-            future, func, args, kws = heapq.heappop(self.delayed_events)
-            func(*args, **kws)
-            self.refresh()
-            now = time.time()
-        if self.delayed_events:
-            delta = max(10, int(1000 * (self.delayed_events[0][0] - now)))
-        else:
-            delta = 5000
-        self.delay_timeout_id = gobject.timeout_add(delta, self.delay_loop)
-
-    def refresh(self):
-        while gtk.events_pending():
-            gtk.main_iteration(False)
 
     ## Callbacks.
 

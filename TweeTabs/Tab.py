@@ -274,14 +274,26 @@ class Periodic(Preset):
 
     def __init__(self):
         Preset.__init__(self)
-        Common.gui.delay(0, self.reload_loop)
+        Common.gui.early(self.reload_generator().next)
 
-    def reload_loop(self):
-        if self.reload():
-            period = self.period
-        else:
-            period = 5
-        Common.gui.delay(period, self.reload_loop)
+    def reload_generator(self):
+        while True:
+            try:
+                self.reload()
+            except Common.Error, exception:
+
+                def delay(iterator):
+                    Common.gui.delay(10, iterator)
+
+                yield delay
+            else:
+                if self.period is not None:
+
+                    def delay(iterator):
+                        Common.gui.delay(self.period, iterator)
+
+                    yield delay
+                yield Common.manager.delay
 
     def reload(self):
         # Shall be defined in derived classes.

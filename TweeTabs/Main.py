@@ -92,10 +92,8 @@ class Main:
             Common.manager = Manager.Threaded_Manager()
         else:
             Common.manager = Manager.Manager()
-        gobject.timeout_add(120 * 1000, Common.manager.get_auth_limit)
-        gobject.timeout_add(180 * 1000, Common.manager.get_ip_limit)
-        Common.gui.delay(10, Common.manager.get_auth_limit)
-        Common.gui.delay(10, Common.manager.get_ip_limit)
+        Common.gui.early(self.get_auth_limit_generator().next)
+        Common.gui.early(self.get_ip_limit_generator().next)
 
         # Read in initial tab setup as set by user.
         if self.initial_tabsetup:
@@ -129,6 +127,24 @@ class Main:
             except KeyboardInterrupt:
                 pass
 
+    def get_auth_limit_generator(self):
+
+        def delay(iterator):
+            Common.gui.delay(120, iterator)
+
+        while True:
+            Common.manager.get_auth_limit()
+            yield delay
+
+    def get_ip_limit_generator(self):
+
+        def delay(iterator):
+            Common.gui.delay(179, iterator)
+
+        while True:
+            Common.manager.get_ip_limit()
+            yield delay
+ 
 run = Main()
 main = run.main
 
