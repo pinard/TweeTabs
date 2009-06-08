@@ -22,8 +22,9 @@ A Twitter reader and personal manager - Strip structures.
 """
 
 __metaclass__ = type
-import StringIO, anydbm, atexit, gtk, pango, re, simplejson, sys, time, urllib
-import PIL.Image, twyt.data
+import Image, ImageDraw, StringIO
+import anydbm, atexit, gtk, pango, re, simplejson, sys, time, urllib
+import twyt.data
 
 import Common
 
@@ -326,8 +327,11 @@ class Image_loader:
 
     def __init__(self):
         # An empty, white image is used until we get the real one.
-        self.empty_pixbuf = self.pixbuf_from_pil(PIL.Image.new(
-            'RGB', (image_size, image_size), (255, 255, 255)))
+        empty = Image.new('RGB', (image_size, image_size))
+        draw = ImageDraw.Draw(empty)
+        draw.rectangle([(0, 0), (image_size - 1, image_size - 1)],
+                       outline=(128, 128, 128), fill=(255, 255, 255))
+        self.empty_pixbuf = self.pixbuf_from_pil(empty)
         # A local database containing images, indexed by Ids.  We go to the
         # Web only when the image is not found within the database, and save
         # any obtained image within the database.
@@ -396,7 +400,7 @@ class Image_loader:
             self.db[id_string] = buffer
         # Transform it into a PIL image.
         try:
-            im = PIL.Image.open(StringIO.StringIO(buffer))
+            im = Image.open(StringIO.StringIO(buffer))
         except IOError:
             return self.empty_pixbuf
         if im.mode != 'RGB':
@@ -409,7 +413,7 @@ class Image_loader:
         elif sy > sx:
             extra = (sy - sx) // 2
             im = im.crop((0, extra, sx, extra + sx))
-        im = im.resize((image_size, image_size), PIL.Image.ANTIALIAS)
+        im = im.resize((image_size, image_size), Image.ANTIALIAS)
         # Transform the result into a pixbuf.
         return self.pixbuf_from_pil(im)
 
@@ -453,7 +457,7 @@ class User_loader:
             def generator():
                 try:
                     buffer = Common.manager.get_user_info(id)
-                except Common.error, exception:
+                except Common.Error, exception:
                     pass
                 else:
                     if buffer:
