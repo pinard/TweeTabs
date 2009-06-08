@@ -98,10 +98,11 @@ class Gui:
     <separator/>
     <menuitem action="Tab Delete"/>
   </menu>
-  <menu action="Strip">
-    <menu action="Strip Select">
-      <menuitem action="Strip Select Clear all"/>
-      <menuitem action="Strip Select Inverse"/>
+  <menu action="Strips">
+    <menuitem action="Strips Sort all"/>
+    <menu action="Strips Select">
+      <menuitem action="Strips Select Clear all"/>
+      <menuitem action="Strips Select Inverse"/>
     </menu>
   </menu>
   <menu action="Help">
@@ -173,10 +174,10 @@ class Gui:
                 # Main menu.
                 ('File', None, "File"),
                 ('Help', None, "Help"),
-                ('Strip', None, "Strip"),
+                ('Strips', None, "Strips"),
                 ('Tab', None, "Tab"),
                 # Sub menus.
-                ('Strip Select', None, "Select"),
+                ('Strips Select', None, "Select"),
                 ('Tab Compose', None, "Compose"),
                 ('Tab Configure', None, "Configure"),
                 ('Tab Select', None, "Select"),
@@ -186,10 +187,12 @@ class Gui:
             group.add_actions([
                 ('File Quit', None, "Quit", None,
                     None, self.file_quit_cb),
-                ('Strip Select Clear all', None, "Clear all", None,
-                    None, self.strip_select_clear_all_cb),
-                ('Strip Select Inverse', None, "Inverse", None,
-                    None, self.strip_select_inverse_cb),
+                ('Strips Select Clear all', None, "Clear all", None,
+                    None, self.strips_select_clear_all_cb),
+                ('Strips Select Inverse', None, "Inverse", None,
+                    None, self.strips_select_inverse_cb),
+                ('Strips Sort all', None, "Sort all", None,
+                    None, self.strips_sort_all_cb),
                 ('Tab Compose Added', None, "Added", None,
                     None, self.tab_compose_added_cb),
                 ('Tab Compose Deleted', None, "Deleted", None,
@@ -308,28 +311,47 @@ class Gui:
 
     def entry_activate(self, widget, data=None):
         text = self.entry_widget.get_text().strip()
+        self.entry_widget.set_text('')
         if text:
             if self.read_only_mode:
-                self.entry_widget.set_text('[unsent]')
-                return
-            self.delay(0, Common.manager.send_tweet, text)
-        self.entry_widget.set_text('')
+                self.error("Sending inhibited")
+            else:
+                self.early(self.send_tweet_generator(text).next)
+
+    def send_tweet_generator(self, text):
+
+        def error_delay(iterator):
+            Common.gui.delay(10, iterator)
+
+        while True:
+            try:
+                Common.manager.send_tweet(text)
+            except Common.Error, exception:
+                yield error_delay
+            else:
+                break
 
     @callback
     def file_quit_cb(self, action):
         gtk.main_quit()
 
     @callback
-    def strip_select_clear_all_cb(self, action):
+    def strips_select_clear_all_cb(self, action):
         tab = self.current_tab()
         for visible_strip in tab.visible_strip.itervalues():
             visible_strip.unselect()
 
     @callback
-    def strip_select_inverse_cb(self, action):
+    def strips_select_inverse_cb(self, action):
         tab = self.current_tab()
         for visible_strip in tab.visible_strip.itervalues():
             visible_strip.toggle_select()
+
+    @callback
+    def strips_sort_all_cb(self, action):
+        tab = self.current_tab()
+        tab.undisplay_strips(tab.strips)
+        tab.display_strips(tab.strips)
 
     @callback
     def tab_compose_added_cb(self, action):
@@ -510,5 +532,4 @@ class Gui:
                     return tab
 
     def get_string(self):
-        return "Allo"
         raise Error("Not implemented yet")

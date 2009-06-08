@@ -277,22 +277,20 @@ class Periodic(Preset):
         Common.gui.early(self.reload_generator().next)
 
     def reload_generator(self):
+
+        def error_delay(iterator):
+            Common.gui.delay(10, iterator)
+
+        def normal_delay(iterator):
+            Common.gui.delay(self.period, iterator)
+
         while True:
             try:
                 self.reload()
             except Common.Error, exception:
-
-                def delay(iterator):
-                    Common.gui.delay(10, iterator)
-
-                yield delay
+                yield error_delay
             else:
-                if self.period is not None:
-
-                    def delay(iterator):
-                        Common.gui.delay(self.period, iterator)
-
-                    yield delay
+                yield normal_delay
                 yield Common.manager.delay
 
     def reload(self):
