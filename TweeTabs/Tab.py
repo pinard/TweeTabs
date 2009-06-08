@@ -55,11 +55,11 @@ class Tab:
         self.create_widget()
         if self.name_base is not None:
             self.set_name(self.name_base)
-        self.freeze()
         for input in inputs:
             self.add_input(input)
-        self.unfreeze()
         self.goto()
+        # Not sure why this is still needed here.
+        self.refresh()
 
     def __str__(self):
         return type(self).__name__ + ' ' + (self.name or str(self.ordinal))
@@ -213,7 +213,7 @@ class Tab:
         self.update_tab_label()
 
     def undisplay_strips(self, strips):
-        for strip in strips:
+        for strip in reversed(sorted(strips)):
             self.tab_vbox.remove(self.visible_strip[strip].widget)
             del self.visible_strip[strip]
         self.update_tab_label()

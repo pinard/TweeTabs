@@ -443,10 +443,10 @@ class User_loader:
         id_string = str(id)
         if self.db.has_key(id_string):
             buffer = self.db[id_string]
-            if buffer:
+            try:
                 user = simplejson.loads(buffer)
-            else:
-                # Correct incorrect prior saving.
+            except ValueError:
+                # If anything is wrong, auto-repair the database.
                 del self.db[id_string]
                 user = None
         else:
