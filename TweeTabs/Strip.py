@@ -349,9 +349,9 @@ class Image_loader:
         # Load an empty image now, so the layout computes faster.
         image.set_from_pixbuf(self.empty_pixbuf)
         # Manage so the real image will replace it soon.
-        Common.gui.early(self.load_generator(image, user).next)
+        Common.launch(self.load_thread, image, user)
 
-    def load_generator(self, image, user):
+    def load_thread(self, image, user):
         # Load the GTK image from the user Id.
         if user.id in self.cache:
             pixbuf, images = self.cache[user.id]
@@ -368,13 +368,13 @@ class Image_loader:
         if len(self.lru) > image_loader_capacity:
             del self.cache[self.lru.pop(0)]
         # Spread the image on all strips where is is already expected.
+        yield Common.gui.early
         pixbuf = self.pixbuf_from_user(user)
         if user.id in self.cache:
             images = self.cache[user.id][1]
             self.cache[user.id] = pixbuf, None
             for image in images:
                 image.set_from_pixbuf(pixbuf)
-        yield None
 
     def pixbuf_from_user(self, user):
         # Get the raw image, either from our database or from the Web.

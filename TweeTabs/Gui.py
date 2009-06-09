@@ -144,13 +144,7 @@ class Gui:
         now = time.time()
         while self.delayed_iterators and now >= self.delayed_iterators[0][0]:
             future, iterator = heapq.heappop(self.delayed_iterators)
-            try:
-                postponer = iterator()
-            except StopIteration:
-                pass
-            else:
-                if postponer is not None:
-                    postponer(iterator)
+            Common.advance(iterator)
             self.refresh()
             now = time.time()
         if self.delayed_iterators:
@@ -316,13 +310,14 @@ class Gui:
             if self.read_only_mode:
                 self.error("Sending inhibited")
             else:
-                self.early(self.send_tweet_generator(text).next)
+                Common.launch(self.send_tweet_thread, text)
 
-    def send_tweet_generator(self, text):
+    def send_tweet_thread(self, text):
 
         def error_delay(iterator):
             Common.gui.delay(10, iterator)
 
+        yield self.early
         while True:
             try:
                 Common.manager.send_tweet(text)
@@ -350,8 +345,7 @@ class Gui:
     @callback
     def strips_sort_all_cb(self, action):
         tab = self.current_tab()
-        tab.undisplay_strips(tab.strips)
-        tab.display_strips(tab.strips)
+        tab.redisplay_strips(tab.strips)
 
     @callback
     def tab_compose_added_cb(self, action):

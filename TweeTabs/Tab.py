@@ -206,17 +206,38 @@ class Tab:
         return strips
 
     def display_strips(self, strips):
-        for strip in sorted(strips):
+        Common.launch(self.display_strips_thread, strips)
+
+    def display_strips_thread(self, strips):
+        for counter, strip in enumerate(sorted(strips)):
+            if counter % 10 == 0 and counter:
+                self.update_tab_label()
+                yield Common.gui.early
             visible_strip = strip.visible_maker(self, strip)
             self.visible_strip[strip] = visible_strip
             self.tab_vbox.pack_start(visible_strip.widget, False, False)
         self.update_tab_label()
 
     def undisplay_strips(self, strips):
-        for strip in reversed(sorted(strips)):
+        Common.launch(self.undisplay_strips_thread, strips)
+
+    def undisplay_strips_thread(self, strips):
+        for counter, strip in enumerate(reversed(sorted(strips))):
+            if counter % 10 == 0 and counter:
+                self.update_tab_label()
+                yield Common.gui.early
             self.tab_vbox.remove(self.visible_strip[strip].widget)
             del self.visible_strip[strip]
         self.update_tab_label()
+
+    def redisplay_strips(self, strips):
+        Common.launch(self.redisplay_strips_thread, strips)
+
+    def redisplay_strips_thread(self, strips):
+        for postponer in self.undisplay_strips_thread(strips):
+            yield postponer
+        for postponer in self.display_strips_thread(strips):
+            yield postponer
 
     def create_widget(self):
         window = gtk.ScrolledWindow()
@@ -274,9 +295,9 @@ class Periodic(Preset):
 
     def __init__(self):
         Preset.__init__(self)
-        Common.gui.early(self.reload_generator().next)
+        Common.launch(self.reload_thread)
 
-    def reload_generator(self):
+    def reload_thread(self):
 
         def error_delay(iterator):
             Common.gui.delay(10, iterator)
@@ -284,6 +305,7 @@ class Periodic(Preset):
         def normal_delay(iterator):
             Common.gui.delay(self.period, iterator)
 
+        yield Common.gui.early
         while True:
             try:
                 self.reload()

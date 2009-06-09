@@ -81,14 +81,7 @@ class Manager:
     def delay_loop(self):
         self.within_delay_loop = True
         pick = random.randint(0, len(self.delayed_iterators) - 1) 
-        iterator = self.delayed_iterators.pop(pick)
-        try:
-            postponer = iterator()
-        except StopIteration:
-            pass
-        else:
-            if postponer is not None:
-                postponer(iterator)
+        Common.advance(self.delayed_iterators.pop(pick))
         self.auth_limit -= 1
         if self.delayed_iterators:
             gobject.timeout_add(self.suggested_delta(), self.delay_loop)
