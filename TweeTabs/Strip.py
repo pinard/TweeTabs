@@ -23,10 +23,10 @@ A Twitter reader and personal manager - Strip structures.
 
 __metaclass__ = type
 import Image, ImageDraw, StringIO
-import anydbm, atexit, gtk, pango, re, simplejson, sys, time, urllib
+import anydbm, atexit, gtk, pango, re, simplejson, time, urllib
 import twyt.data
 
-import Common
+import Common, Scheduler
 
 image_size = 60
 image_loader_capacity = 100 
@@ -349,7 +349,7 @@ class Image_loader:
         # Load an empty image now, so the layout computes faster.
         image.set_from_pixbuf(self.empty_pixbuf)
         # Manage so the real image will replace it soon.
-        Common.launch(self.load_thread, image, user)
+        Scheduler.launch(None, self.load_thread, image, user)
 
     def load_thread(self, image, user):
         # Load the GTK image from the user Id.
@@ -368,7 +368,7 @@ class Image_loader:
         if len(self.lru) > image_loader_capacity:
             del self.cache[self.lru.pop(0)]
         # Spread the image on all strips where is is already expected.
-        yield Common.gui.early
+        yield 0
         pixbuf = self.pixbuf_from_user(user)
         if user.id in self.cache:
             images = self.cache[user.id][1]
@@ -454,7 +454,8 @@ class User_loader:
 
         if not user:
 
-            def generator():
+            def thread():
+                yield 0
                 try:
                     buffer = Common.manager.get_user_info(id)
                 except Common.Error, exception:
@@ -462,9 +463,8 @@ class User_loader:
                 else:
                     if buffer:
                         self.db[str(id)] = buffer
-                yield None
 
-            Common.manager.delay(generator().next)
+            Scheduler.launch(None, thread)
             user = {'id': id_string,
                     'name': '',
                     'screen_name': id_string,

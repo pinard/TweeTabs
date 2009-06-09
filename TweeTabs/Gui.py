@@ -22,9 +22,9 @@ A Twitter reader and personal manager - (part of) User Interface.
 """
 
 __metaclass__ = type
-import gobject, gtk, heapq, sys, time
+import gtk
 
-import Common, Tab
+import Common, Scheduler, Tab
 
 class Error(Common.Error):
     pass
@@ -52,8 +52,6 @@ class Gui:
     user_color = 'brown'
     tag_color = 'darkgreen'
     url_color = 'blue'
-
-    within_delay_loop = False
 
     user_interface = '''\
 <menubar name="MenuBar">
@@ -111,8 +109,6 @@ class Gui:
 '''
 
     def __init__(self):
-        self.delay_timeout_id = None
-        self.delayed_iterators = []
         self.create_widget()
       
     def start(self):
@@ -125,34 +121,6 @@ class Gui:
         gtk.main()
         if Common.threaded:
             gtk.gdk.threads_leave()
-
-    def early(self, iterator):
-        self.delay(0, iterator)
-
-    def delay(self, delta, iterator):
-        now = time.time()
-        future = now + delta
-        heapq.heappush(self.delayed_iterators, (future, iterator))
-        if not self.within_delay_loop:
-            if self.delay_timeout_id is not None:
-                gobject.source_remove(self.delay_timeout_id)
-            delta = max(10, int(1000 * (self.delayed_iterators[0][0] - now)))
-            self.delay_timeout_id = gobject.timeout_add(delta, self.delay_loop)
-
-    def delay_loop(self):
-        self.within_delay_loop = True
-        now = time.time()
-        while self.delayed_iterators and now >= self.delayed_iterators[0][0]:
-            future, iterator = heapq.heappop(self.delayed_iterators)
-            Common.advance(iterator)
-            self.refresh()
-            now = time.time()
-        if self.delayed_iterators:
-            delta = max(10, int(1000 * (self.delayed_iterators[0][0] - now)))
-        else:
-            delta = 5000
-        self.delay_timeout_id = gobject.timeout_add(delta, self.delay_loop)
-        self.within_delay_loop = False
 
     def refresh(self):
         while gtk.events_pending():
@@ -310,19 +278,15 @@ class Gui:
             if self.read_only_mode:
                 self.error("Sending inhibited")
             else:
-                Common.launch(self.send_tweet_thread, text)
+                Scheduler.launch(None, self.send_tweet_thread, text)
 
     def send_tweet_thread(self, text):
-
-        def error_delay(iterator):
-            Common.gui.delay(10, iterator)
-
-        yield self.early
+        yield 0
         while True:
             try:
                 Common.manager.send_tweet(text)
             except Common.Error, exception:
-                yield error_delay
+                yield 10
             else:
                 break
 

@@ -22,10 +22,10 @@ A Twitter reader and personal manager - Twitter API management.
 """
 
 __metaclass__ = type
-import gobject, os, random, simplejson, sys
+import simplejson
 import twyt.twitter, twyt.data
 
-import Common, Strip
+import Common, Scheduler, Strip
 
 class Error(Common.Error):
     pass
@@ -35,7 +35,6 @@ twitter = twyt.twitter.Twitter()
 # Set these from your ~/.tweetabs/defaults.py file, rather than here.
 user = None
 password = None
-blanking_delay = 4
 
 class twytcall:
 
@@ -60,46 +59,15 @@ class twytcall:
 class Manager:
     auth_limit = 50
     ip_limit = 50
-    blanker_active = False
-    within_delay_loop = False
 
     def __init__(self):
         twitter.set_user_agent("TweeTabs")
         twitter.set_auth(user, password)
         self.error_list = []
-        self.delayed_iterators = []
-        self.create_deltas()
 
     def start(self):
         pass
-
-    def delay(self, iterator):
-        self.delayed_iterators.append(iterator)
-        if not self.within_delay_loop and len(self.delayed_iterators) == 1:
-            gobject.timeout_add(self.suggested_delta(), self.delay_loop)
-
-    def delay_loop(self):
-        self.within_delay_loop = True
-        pick = random.randint(0, len(self.delayed_iterators) - 1) 
-        Common.advance(self.delayed_iterators.pop(pick))
-        self.auth_limit -= 1
-        if self.delayed_iterators:
-            gobject.timeout_add(self.suggested_delta(), self.delay_loop)
-        self.within_delay_loop = False
-
-    def create_deltas(self):
-        a = 0
-        b = 1
-        deltas = []
-        while len(deltas) < 11 or b < 30 * 60:
-            a, b = b, a + b
-            deltas.append(a)
-        self.deltas = deltas[-11:]
-
-    def suggested_delta(self):
-        limit = max(0, min(100, self.auth_limit))
-        return 1000 * self.deltas[(100 - limit) // 10]
-
+    
     def message(self, message=None):
         if message:
             Common.gui.twitter_message_widget.set_markup(
@@ -110,23 +78,19 @@ class Manager:
 
     def error(self, message):
         self.error_list.append(message)
-        if not self.blanker_active:
-            gobject.timeout_add(int(1000 * blanking_delay),
-                                self.error_displayer)
-            self.blanker_active = True
-            self.error_displayer()
+        if len(self.error_list) == 1:
+            Scheduler.launch(None, self.error_thread)
 
-    def error_displayer(self):
-        if self.error_list:
+    def error_thread(self):
+        while self.error_list:
+            message = self.error_list[0]
             Common.gui.twitter_error_widget.set_markup(
                     '<span size="small" weight="bold" foreground="red">'
                     + Common.escape(self.error_list.pop(0)) + '</span>')
-            Common.gui.refresh()
-            return True
-        Common.gui.twitter_error_widget.set_label('')
-        Common.gui.refresh()
-        self.blanker_active = False
-        return False
+            yield Common.blanking_delay
+            Common.gui.twitter_error_widget.set_label('')
+            yield 0.2
+            self.error_list.pop(0)
 
     ## Twitter services.
 

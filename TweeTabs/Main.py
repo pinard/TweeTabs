@@ -37,7 +37,7 @@ Debugging options:
 __metaclass__ = type
 import gobject, gtk, os, sys
 
-import Common
+import Common, Scheduler
 
 class Main:
     initial_tabsetup = True
@@ -92,8 +92,8 @@ class Main:
             Common.manager = Manager.Threaded_Manager()
         else:
             Common.manager = Manager.Manager()
-        Common.launch(self.get_auth_limit_thread)
-        Common.launch(self.get_ip_limit_thread)
+        Scheduler.launch(None, self.get_auth_limit_thread)
+        Scheduler.launch(None, self.get_ip_limit_thread)
 
         # Read in initial tab setup as set by user.
         if self.initial_tabsetup:
@@ -128,24 +128,16 @@ class Main:
                 pass
 
     def get_auth_limit_thread(self):
-
-        def delay(iterator):
-            Common.gui.delay(120, iterator)
-
-        yield Common.gui.early
+        yield 0
         while True:
             Common.manager.get_auth_limit()
-            yield delay
+            yield 120
 
     def get_ip_limit_thread(self):
-
-        def delay(iterator):
-            Common.gui.delay(179, iterator)
-
-        yield Common.gui.early
+        yield 0
         while True:
             Common.manager.get_ip_limit()
-            yield delay
+            yield 179
  
 run = Main()
 main = run.main

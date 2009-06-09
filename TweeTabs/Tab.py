@@ -24,7 +24,7 @@ A Twitter reader and personal manager - Tab structures.
 __metaclass__ = type
 import atexit, gtk, re, sys
 
-import Common, Strip
+import Common, Scheduler, Strip
 
 class Error(Common.Error):
     pass
@@ -206,38 +206,29 @@ class Tab:
         return strips
 
     def display_strips(self, strips):
-        Common.launch(self.display_strips_thread, strips)
+        Scheduler.launch(self, self.display_strips_thread, strips)
 
     def display_strips_thread(self, strips):
         for counter, strip in enumerate(sorted(strips)):
             if counter % 10 == 0 and counter:
                 self.update_tab_label()
-                yield Common.gui.early
+                yield 0
             visible_strip = strip.visible_maker(self, strip)
             self.visible_strip[strip] = visible_strip
             self.tab_vbox.pack_start(visible_strip.widget, False, False)
         self.update_tab_label()
 
     def undisplay_strips(self, strips):
-        Common.launch(self.undisplay_strips_thread, strips)
+        Scheduler.launch(self, self.undisplay_strips_thread, strips)
 
     def undisplay_strips_thread(self, strips):
         for counter, strip in enumerate(reversed(sorted(strips))):
             if counter % 10 == 0 and counter:
                 self.update_tab_label()
-                yield Common.gui.early
+                yield 0
             self.tab_vbox.remove(self.visible_strip[strip].widget)
             del self.visible_strip[strip]
         self.update_tab_label()
-
-    def redisplay_strips(self, strips):
-        Common.launch(self.redisplay_strips_thread, strips)
-
-    def redisplay_strips_thread(self, strips):
-        for postponer in self.undisplay_strips_thread(strips):
-            yield postponer
-        for postponer in self.display_strips_thread(strips):
-            yield postponer
 
     def create_widget(self):
         window = gtk.ScrolledWindow()
@@ -295,25 +286,18 @@ class Periodic(Preset):
 
     def __init__(self):
         Preset.__init__(self)
-        Common.launch(self.reload_thread)
+        Scheduler.launch(None, self.reload_thread)
 
     def reload_thread(self):
-
-        def error_delay(iterator):
-            Common.gui.delay(10, iterator)
-
-        def normal_delay(iterator):
-            Common.gui.delay(self.period, iterator)
-
-        yield Common.gui.early
+        yield 0
         while True:
             try:
                 self.reload()
             except Common.Error, exception:
-                yield error_delay
+                yield 10
             else:
-                yield normal_delay
-                yield Common.manager.delay
+                yield self.period
+                yield True
 
     def reload(self):
         # Shall be defined in derived classes.
