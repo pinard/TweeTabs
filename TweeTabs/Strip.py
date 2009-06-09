@@ -349,9 +349,9 @@ class Image_loader:
         # Load an empty image now, so the layout computes faster.
         image.set_from_pixbuf(self.empty_pixbuf)
         # Manage so the real image will replace it soon.
-        Scheduler.Thread(self.load_thread(image, user))
+        Scheduler.Thread(self.load_image_thread(image, user))
 
-    def load_thread(self, image, user):
+    def load_image_thread(self, image, user):
         # Load the GTK image from the user Id.
         if user.id in self.cache:
             pixbuf, images = self.cache[user.id]
@@ -446,7 +446,7 @@ class User_loader:
             try:
                 user = simplejson.loads(buffer)
             except ValueError:
-                # If anything is wrong, auto-repair the database.
+                # If anything is wrong, try auto-repairing the database.
                 del self.db[id_string]
                 user = None
         else:
@@ -454,17 +454,7 @@ class User_loader:
 
         if not user:
 
-            def thread():
-                yield 0
-                try:
-                    buffer = Common.twitter.get_user_info(id)
-                except Common.Error, exception:
-                    pass
-                else:
-                    if buffer:
-                        self.db[str(id)] = buffer
-
-            Scheduler.Thread(thread())
+            Scheduler.Thread(self.load_user_thread(id))
             user = {'id': id_string,
                     'name': '',
                     'screen_name': id_string,
@@ -475,5 +465,15 @@ class User_loader:
                     'protected': False}
 
         return twyt.data.User(user)
+
+    def load_user_thread(self, id):
+        yield 0
+        try:
+            buffer = Common.twitter.get_user_info(id)
+        except Common.Error, exception:
+            pass
+        else:
+            if buffer:
+                self.db[str(id)] = buffer
 
 user_loader = User_loader()

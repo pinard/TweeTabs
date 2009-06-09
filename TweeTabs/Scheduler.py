@@ -43,16 +43,14 @@ class Thread:
     # ignored and control returns immediately.  Once done with its work, the
     # generator may either fall through its end, or do an explicit "return".
 
-    # The second argument is either a single lock, a list or tuple of locks,
-    # or None for no lock at all.  A thread acquires all of its locks
-    # at once before it starts, and releases them all after it finishes.
-    # So, a thread start will be postponed until all its locks are free.
+    # The second argument is either a single lock, a list or tuple of locks.
+    # A thread acquires all of its locks at once before it starts, and
+    # releases them all after it finishes.  So, a thread start will be
+    # postponed until all its locks are free.
 
-    def __init__(self, iterator, locks=None):
+    def __init__(self, iterator, locks=()):
         self.iterator = iterator
-        if locks is None:
-            self.locks = ()
-        elif isinstance(locks, (list, tuple)):
+        if isinstance(locks, (list, tuple)):
             self.locks = locks
         else:
             self.locks = locks,
