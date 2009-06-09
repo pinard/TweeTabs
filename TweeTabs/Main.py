@@ -92,8 +92,8 @@ class Main:
             Common.twitter = Twitter.Threaded_Twitter()
         else:
             Common.twitter = Twitter.Twitter()
-        Scheduler.launch(None, self.get_auth_limit_thread)
-        Scheduler.launch(None, self.get_ip_limit_thread)
+        Scheduler.Thread(self.get_auth_limit_thread())
+        Scheduler.Thread(self.get_ip_limit_thread())
 
         # Read in initial tab setup as set by user.
         if self.initial_tabsetup:

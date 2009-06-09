@@ -349,7 +349,7 @@ class Image_loader:
         # Load an empty image now, so the layout computes faster.
         image.set_from_pixbuf(self.empty_pixbuf)
         # Manage so the real image will replace it soon.
-        Scheduler.launch(None, self.load_thread, image, user)
+        Scheduler.Thread(self.load_thread(image, user))
 
     def load_thread(self, image, user):
         # Load the GTK image from the user Id.
@@ -464,7 +464,7 @@ class User_loader:
                     if buffer:
                         self.db[str(id)] = buffer
 
-            Scheduler.launch(None, thread)
+            Scheduler.Thread(thread())
             user = {'id': id_string,
                     'name': '',
                     'screen_name': id_string,

@@ -25,60 +25,90 @@ import gobject, heapq, random, time
 
 import Common
 
+class Thread:
+
+    # This is TweeTabs' solution, away of Python threads.  It has the purpose
+    # of starting a new (non-Python) thread.  The thread in this case is
+    # represented and driven by a generator method.
+
+    # The first argument is an iterator.  Usually, this is the result of
+    # calling a generator.  Such a generator does not accomplish its mission
+    # all in a row: it relinquishes control once in a while, giving a chance
+    # to other parts of the program to progress in parallel.  To do so,
+    # it "yield"s a special value.  If that value is an integer or float,
+    # this is a minimum number of seconds to wait before control returns.
+    # If that value is True, the delay is automatically chosen to slow down
+    # the pace of requests to the Twitter API, as the Twitter site enforces a
+    # limit of 100 requests per hour.  If that value is None, the "yield" is
+    # ignored and control returns immediately.  Once done with its work, the
+    # generator may either fall through its end, or do an explicit "return".
+
+    # The second argument is either a single lock, a list or tuple of locks,
+    # or None for no lock at all.  A thread acquires all of its locks
+    # at once before it starts, and releases them all after it finishes.
+    # So, a thread start will be postponed until all its locks are free.
+
+    def __init__(self, iterator, locks=None):
+        self.iterator = iterator
+        if locks is None:
+            self.locks = ()
+        elif isinstance(locks, (list, tuple)):
+            self.locks = locks
+        else:
+            self.locks = locks,
+        if scheduler.acquire_locks(self.locks):
+            self.advance()
+        else:
+            scheduler.lock_wait_queue.append(self)
+
+    def advance(self):
+        while True:
+            try:
+                delta = self.iterator.next()
+            except StopIteration:
+                scheduler.release_locks(self.locks)
+                return
+            if delta is True:
+                scheduler.slow_down(self)
+                return
+            if isinstance(delta, (int, float)):
+                scheduler.delay(delta, self)
+                return
+            assert delta is None, delta
+
 class Scheduler:
 
     def __init__(self):
+        self.granted_locks = set()
+        self.lock_wait_queue = []
+        self.timeout_id = None
+        self.delayed_threads = []
+        self.within_delay_loop = False
+        self.slowed_down_threads = []
+        self.within_slow_down_loop = False
         self.create_slow_down_deltas()
 
-    # The following function offers a way around Python threads.  It has
-    # the purpose of starting a new (non-Python) thread.  The thread in this
-    # case is represented and driven by a generator method.
+    def acquire_locks(self, locks):
+        for lock in locks:
+            if lock in self.granted_locks:
+                return False
+        for lock in locks:
+            self.granted_locks.add(lock)
+        return True
 
-    # The first argument is either a single lock, a list or tuple of locks,
-    # or None for no lock at all.  A thread will tie all of its locks at
-    # once before it starts, and untie them all after it finishes.  A thread
-    # start will be postponed until all its locks are free.
-
-    # The second argument is the generator method, and all extra arguments are
-    # transmitted to the generator method when called.  The generator usually
-    # does not accomplish its mission all in a row: it relinquishes control
-    # once in a while, giving a chance to some other part of the program
-    # to progress in parallel.  To do so, it "yield"s a special value.
-    # If that value is an integer or float, this is a number of seconds
-    # to wait before control returns.  If that value is True, the delay is
-    # automatically chosen to slow down the pace of requests to the Twitter
-    # API, as the Twitter site enforces a limit of 100 requests per hour.
-    # Once done with its work, the generator may either fall through its end,
-    # do "return", or "yield None".
-
-    def launch(self, locks, generator, *args, **kws):
-        if locks is None:
-            locks = []
-        if not isinstance(locks, (list, tuple)):
-            locks = [locks]
-        thread = generator(*args, **kws).next
-        self.advance(thread)
-
-    def advance(self, thread):
-        try:
-            delay = thread()
-        except StopIteration:
-            pass
+    def release_locks(self, locks):
+        for lock in locks:
+            self.granted_locks.remove(lock)
+        for counter, thread in enumerate(self.lock_wait_queue):
+            if self.acquire_locks(thread.locks):
+                break
         else:
-            if delay is True:
-                self.slow_down(thread)
-                return
-            if isinstance(delay, (int, float)):
-                self.delay(delay, thread)
-                return
-            assert delay is None, delay
+            return
+        del self.lock_wait_queue[counter]
+        thread.advance()
 
     # Delayed threads contains a priority queue of (Future, Thread), where
     # Future is a wanted time for resuming Thread.
-
-    timeout_id = None
-    delayed_threads = []
-    within_delay_loop = False
 
     def delay(self, delta, thread):
         now = time.time()
@@ -95,7 +125,7 @@ class Scheduler:
         now = time.time()
         while self.delayed_threads and now >= self.delayed_threads[0][0]:
             future, thread = heapq.heappop(self.delayed_threads)
-            self.advance(thread)
+            thread.advance()
             Common.gui.refresh()
             now = time.time()
         if self.delayed_threads:
@@ -111,9 +141,6 @@ class Scheduler:
     # as an heuristic way to give everything a more equal chance, in case
     # of lot of related threads get added in a row.
 
-    slowed_down_threads = []
-    within_slow_down_loop = False
-
     def slow_down(self, thread):
         self.slowed_down_threads.append(thread)
         if (not self.within_slow_down_loop
@@ -123,7 +150,7 @@ class Scheduler:
     def slow_down_loop(self):
         self.within_slow_down_loop = True
         pick = random.randint(0, len(self.slowed_down_threads) - 1) 
-        self.advance(self.slowed_down_threads.pop(pick))
+        self.slowed_down_threads.pop(pick).advance()
         Common.twitter.auth_limit -= 1
         if self.slowed_down_threads:
             gobject.timeout_add(self.slow_down_delta(), self.slow_down_loop)
@@ -143,4 +170,3 @@ class Scheduler:
         return self.slow_down_deltas[(100 - limit) // 10]
 
 scheduler = Scheduler()
-launch = scheduler.launch

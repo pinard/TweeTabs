@@ -279,7 +279,7 @@ class Gui:
             if self.read_only_mode:
                 self.error("Sending inhibited")
             else:
-                Scheduler.launch(None, self.send_tweet_thread, text)
+                Scheduler.Thread(self.send_tweet_thread(text))
 
     def send_tweet_thread(self, text):
         yield 0

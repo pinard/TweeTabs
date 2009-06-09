@@ -206,7 +206,7 @@ class Tab:
         return strips
 
     def display_strips(self, strips):
-        Scheduler.launch(self, self.display_strips_thread, strips)
+        Scheduler.Thread(self.display_strips_thread(strips), self)
 
     def display_strips_thread(self, strips):
         for counter, strip in enumerate(sorted(strips)):
@@ -219,7 +219,7 @@ class Tab:
         self.update_tab_label()
 
     def undisplay_strips(self, strips):
-        Scheduler.launch(self, self.undisplay_strips_thread, strips)
+        Scheduler.Thread(self.undisplay_strips_thread(strips), self)
 
     def undisplay_strips_thread(self, strips):
         for counter, strip in enumerate(reversed(sorted(strips))):
@@ -286,9 +286,9 @@ class Periodic(Preset):
 
     def __init__(self):
         Preset.__init__(self)
-        Scheduler.launch(None, self.reload_thread)
+        Scheduler.Thread(self.periodic_reload_thread())
 
-    def reload_thread(self):
+    def periodic_reload_thread(self):
         yield 0
         while True:
             try:

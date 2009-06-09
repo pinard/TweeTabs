@@ -76,17 +76,17 @@ class Twitter:
             Common.gui.twitter_message_widget.set_label('')
         Common.gui.refresh()
 
-    def error(self, message):
-        self.error_list.append(message)
+    def error(self, diagnostic):
+        self.error_list.append(diagnostic)
         if len(self.error_list) == 1:
-            Scheduler.launch(None, self.error_thread)
+            Scheduler.Thread(self.error_thread())
 
     def error_thread(self):
         while self.error_list:
-            message = self.error_list[0]
+            diagnostic = self.error_list[0]
             Common.gui.twitter_error_widget.set_markup(
                     '<span size="small" weight="bold" foreground="red">'
-                    + Common.escape(self.error_list.pop(0)) + '</span>')
+                    + Common.escape(self.diagnostic) + '</span>')
             yield Common.gui.blanking_delay
             Common.gui.twitter_error_widget.set_label('')
             yield 0.2
