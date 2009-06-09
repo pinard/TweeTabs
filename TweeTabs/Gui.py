@@ -52,6 +52,7 @@ class Gui:
     user_color = 'brown'
     tag_color = 'darkgreen'
     url_color = 'blue'
+    blanking_delay = 4
 
     user_interface = '''\
 <menubar name="MenuBar">
@@ -284,7 +285,7 @@ class Gui:
         yield 0
         while True:
             try:
-                Common.manager.send_tweet(text)
+                Common.twitter.send_tweet(text)
             except Common.Error, exception:
                 yield 10
             else:
@@ -309,7 +310,8 @@ class Gui:
     @callback
     def strips_sort_all_cb(self, action):
         tab = self.current_tab()
-        tab.redisplay_strips(tab.strips)
+        tab.undisplay_strips(tab.strips)
+        tab.display_strips(tab.strips)
 
     @callback
     def tab_compose_added_cb(self, action):

@@ -457,7 +457,7 @@ class User_loader:
             def thread():
                 yield 0
                 try:
-                    buffer = Common.manager.get_user_info(id)
+                    buffer = Common.twitter.get_user_info(id)
                 except Common.Error, exception:
                     pass
                 else:

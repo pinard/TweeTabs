@@ -30,7 +30,7 @@ import Common, Scheduler, Strip
 class Error(Common.Error):
     pass
 
-twitter = twyt.twitter.Twitter()
+twytter = twyt.twitter.Twitter()
 
 # Set these from your ~/.tweetabs/defaults.py file, rather than here.
 user = None
@@ -56,13 +56,13 @@ class twytcall:
 
         return decorated
 
-class Manager:
+class Twitter:
     auth_limit = 50
     ip_limit = 50
 
     def __init__(self):
-        twitter.set_user_agent("TweeTabs")
-        twitter.set_auth(user, password)
+        twytter.set_user_agent("TweeTabs")
+        twytter.set_auth(user, password)
         self.error_list = []
 
     def start(self):
@@ -87,7 +87,7 @@ class Manager:
             Common.gui.twitter_error_widget.set_markup(
                     '<span size="small" weight="bold" foreground="red">'
                     + Common.escape(self.error_list.pop(0)) + '</span>')
-            yield Common.blanking_delay
+            yield Common.gui.blanking_delay
             Common.gui.twitter_error_widget.set_label('')
             yield 0.2
             self.error_list.pop(0)
@@ -96,13 +96,13 @@ class Manager:
 
     @twytcall("getting Auth limit")
     def get_auth_limit(self):
-        response = twyt.data.RateLimit(twitter.account_rate_limit_status(True))
+        response = twyt.data.RateLimit(twytter.account_rate_limit_status(True))
         self.auth_limit = response['remaining_hits']
         self.display_limits()
 
     @twytcall("getting IP limit")
     def get_ip_limit(self):
-        response = twyt.data.RateLimit(twitter.account_rate_limit_status(False))
+        response = twyt.data.RateLimit(twytter.account_rate_limit_status(False))
         self.ip_limit = response['remaining_hits']
         self.display_limits()
 
@@ -110,64 +110,64 @@ class Manager:
     def fetch_followers(self, tab):
         tab.preset_strips = set(map(
             Strip.User,
-            simplejson.loads(twitter.social_graph_followers_ids())))
+            simplejson.loads(twytter.social_graph_followers_ids())))
         tab.refresh()
 
     @twytcall("fetching following")
     def fetch_following(self, tab):
         tab.preset_strips = set(map(
             Strip.User,
-            simplejson.loads(twitter.social_graph_friends_ids())))
+            simplejson.loads(twytter.social_graph_friends_ids())))
         tab.refresh()
 
     @twytcall("getting user info")
     def get_user_info(self, id):
-        return twitter.user_show(id)
+        return twytter.user_show(id)
 
     @twytcall("loading direct timeline")
     def load_direct_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            twyt.data.StatusList(twitter.direct_messages())))
+            twyt.data.StatusList(twytter.direct_messages())))
         tab.refresh()
 
     @twytcall("loading direct sent timeline")
     def load_direct_sent_timeline(self, tab):
         tab.preset_strips |= set(map(
-            Strip.Tweet, twyt.data.StatusList(twitter.direct_sent())))
+            Strip.Tweet, twyt.data.StatusList(twytter.direct_sent())))
         tab.refresh()
 
     @twytcall("loading friends timeline")
     def load_friends_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            twyt.data.StatusList(twitter.status_friends_timeline())))
+            twyt.data.StatusList(twytter.status_friends_timeline())))
         tab.refresh()
 
     @twytcall("loading public timeline")
     def load_public_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            twyt.data.StatusList(twitter.status_public_timeline())))
+            twyt.data.StatusList(twytter.status_public_timeline())))
         tab.refresh()
 
     @twytcall("loading replies timeline")
     def load_replies_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            twyt.data.StatusList(twitter.status_replies())))
+            twyt.data.StatusList(twytter.status_replies())))
         tab.refresh()
 
     @twytcall("loading user timeline")
     def load_user_timeline(self, tab):
         tab.preset_strips |= set(map(
             Strip.Tweet,
-            twyt.data.StatusList(twitter.status_user_timeline())))
+            twyt.data.StatusList(twytter.status_user_timeline())))
         tab.refresh()
 
     @twytcall("sending tweet")
     def send_tweet(self, message):
-        twitter.status_update(message)
+        twytter.status_update(message)
 
     ## Services.
 
@@ -181,13 +181,13 @@ if Common.threaded:
 
     import Queue, threading
 
-    class Threaded_Manager(threading.Thread, Manager):
+    class Threaded_Twitter(threading.Thread, Twitter):
         quit_flag = False
 
         def __init__(self):
             threading.Thread.__init__(self, name="Twitter manager")
             self.queue = Queue.Queue()
-            Manager.__init__(self)
+            Twitter.__init__(self)
 
         def run(self):
             while not self.quit_flag:

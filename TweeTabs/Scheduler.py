@@ -124,7 +124,7 @@ class Scheduler:
         self.within_slow_down_loop = True
         pick = random.randint(0, len(self.slowed_down_threads) - 1) 
         self.advance(self.slowed_down_threads.pop(pick))
-        Common.manager.auth_limit -= 1
+        Common.twitter.auth_limit -= 1
         if self.slowed_down_threads:
             gobject.timeout_add(self.slow_down_delta(), self.slow_down_loop)
         self.within_slow_down_loop = False
@@ -139,7 +139,7 @@ class Scheduler:
         self.slow_down_deltas = deltas[-11:]
 
     def slow_down_delta(self):
-        limit = max(0, min(100, Common.manager.auth_limit))
+        limit = max(0, min(100, Common.twitter.auth_limit))
         return self.slow_down_deltas[(100 - limit) // 10]
 
 scheduler = Scheduler()

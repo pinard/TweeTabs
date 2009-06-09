@@ -39,4 +39,4 @@ threaded = False
 gui = None
 
 # The single instance of the Twitter manager, patched in from Main.
-manager = None
+twitter = None

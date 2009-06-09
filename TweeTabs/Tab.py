@@ -386,7 +386,7 @@ class Direct_timeline(Periodic):
     period = 3 * 60
 
     def reload(self):
-        return Common.manager.load_direct_timeline(self)
+        return Common.twitter.load_direct_timeline(self)
 
 class Direct_sent_timeline(Periodic):
     strip_type = Strip.Tweet
@@ -394,7 +394,7 @@ class Direct_sent_timeline(Periodic):
     period = 60 * 60
 
     def reload(self):
-        return Common.manager.load_direct_sent_timeline(self)
+        return Common.twitter.load_direct_sent_timeline(self)
 
 class Followers(Periodic):
     strip_type = Strip.User
@@ -403,7 +403,7 @@ class Followers(Periodic):
     period = 60 * 60
 
     def reload(self):
-        return Common.manager.fetch_followers(self)
+        return Common.twitter.fetch_followers(self)
 
 class Following(Periodic):
     strip_type = Strip.User
@@ -412,7 +412,7 @@ class Following(Periodic):
     period = 60 * 60
 
     def reload(self):
-        return Common.manager.fetch_following(self)
+        return Common.twitter.fetch_following(self)
 
 class Friends_timeline(Periodic):
     strip_type = Strip.Tweet
@@ -420,7 +420,7 @@ class Friends_timeline(Periodic):
     period = 10 * 60
 
     def reload(self):
-        return Common.manager.load_friends_timeline(self)
+        return Common.twitter.load_friends_timeline(self)
 
 class Id_input(Preset):
 
@@ -484,7 +484,7 @@ class Public_timeline(Periodic):
     period = 2 * 60
 
     def reload(self):
-        return Common.manager.load_public_timeline(self)
+        return Common.twitter.load_public_timeline(self)
 
 class Replies_timeline(Periodic):
     strip_type = Strip.Tweet
@@ -492,16 +492,16 @@ class Replies_timeline(Periodic):
     period = 2 * 60
 
     def reload(self):
-        return Common.manager.load_replies_timeline(self)
+        return Common.twitter.load_replies_timeline(self)
 
 class User_timeline(Periodic):
     strip_type = Strip.Tweet
     period = 4 * 60
 
     def __init__(self):
-        import Manager
-        self.name_base = Manager.user.capitalize()
+        import Twitter
+        self.name_base = Twitter.user.capitalize()
         Periodic.__init__(self)
 
     def reload(self):
-        return Common.manager.load_user_timeline(self)
+        return Common.twitter.load_user_timeline(self)

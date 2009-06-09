@@ -69,7 +69,7 @@ class Main:
             Common.configdir = os.path.expanduser('~/.tweetabs')
 
         # Should only be imported after option decoding.
-        import Gui, Manager, Strip, Tab
+        import Gui, Twitter, Strip, Tab
 
         # Push some options into Gui.
         if self.geometry is not None:
@@ -81,17 +81,17 @@ class Main:
 
         # Read in default initialization as set by user.
         if os.path.exists(Common.configdir + '/defaults.py'):
-            context = {'Gui': Gui.Gui, 'Strip': Strip, 'Twitter': Manager}
+            context = {'Gui': Gui.Gui, 'Strip': Strip, 'Twitter': Twitter}
             execfile(Common.configdir + '/defaults.py', context, {})
-        if Manager.user is None or Manager.password is None:
+        if Twitter.user is None or Twitter.password is None:
             sys.exit("Twitter user not set, set it in your defaults.py file.")
 
         # Prepare the GUI (first), then the Twitter manager.
         Common.gui = Gui.Gui()
         if Common.threaded:
-            Common.manager = Manager.Threaded_Manager()
+            Common.twitter = Twitter.Threaded_Twitter()
         else:
-            Common.manager = Manager.Manager()
+            Common.twitter = Twitter.Twitter()
         Scheduler.launch(None, self.get_auth_limit_thread)
         Scheduler.launch(None, self.get_ip_limit_thread)
 
@@ -115,28 +115,28 @@ class Main:
 
         # Start the Twitter manager (first), then the GUI.
         if Common.threaded:
-            Common.manager.start()
+            Common.twitter.start()
         try:
             Common.gui.start()
         except KeyboardInterrupt:
             pass
         if Common.threaded:
             try:
-                Common.manager.enqueue(Common.manager.quit)
-                Common.manager.join()
+                Common.twitter.enqueue(Common.twitter.quit)
+                Common.twitter.join()
             except KeyboardInterrupt:
                 pass
 
     def get_auth_limit_thread(self):
         yield 0
         while True:
-            Common.manager.get_auth_limit()
+            Common.twitter.get_auth_limit()
             yield 120
 
     def get_ip_limit_thread(self):
         yield 0
         while True:
-            Common.manager.get_ip_limit()
+            Common.twitter.get_ip_limit()
             yield 179
  
 run = Main()
