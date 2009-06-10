@@ -455,7 +455,7 @@ class User_loader:
         if not user:
 
             Scheduler.Thread(self.load_user_thread(id))
-            user = {'id': id_string,
+            user = {'id': id,
                     'name': '',
                     'screen_name': id_string,
                     'location': None,

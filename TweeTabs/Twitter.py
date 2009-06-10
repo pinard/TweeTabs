@@ -86,7 +86,7 @@ class Twitter:
             diagnostic = self.error_list[0]
             Common.gui.twitter_error_widget.set_markup(
                     '<span size="small" weight="bold" foreground="red">'
-                    + Common.escape(self.diagnostic) + '</span>')
+                    + Common.escape(diagnostic) + '</span>')
             yield Common.gui.blanking_delay
             Common.gui.twitter_error_widget.set_label('')
             yield 0.2
