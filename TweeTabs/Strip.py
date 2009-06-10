@@ -470,7 +470,7 @@ class User_loader:
         yield 0
         try:
             buffer = Common.twitter.get_user_info(id)
-        except Common.Error, exception:
+        except Common.Error:
             pass
         else:
             if buffer:

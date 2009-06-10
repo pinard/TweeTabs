@@ -130,14 +130,22 @@ class Main:
     def get_auth_limit_thread(self):
         yield 0
         while True:
-            Common.twitter.get_auth_limit()
-            yield 120
+            try:
+                Common.twitter.get_auth_limit()
+            except Common.Error:
+                yield 20
+            else:
+                yield 120
 
     def get_ip_limit_thread(self):
         yield 0
         while True:
-            Common.twitter.get_ip_limit()
-            yield 179
+            try:
+                Common.twitter.get_ip_limit()
+            except Common.Error:
+                yield 20
+            else:
+                yield 179
  
 run = Main()
 main = run.main

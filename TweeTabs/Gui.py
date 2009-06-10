@@ -286,7 +286,7 @@ class Gui:
         while True:
             try:
                 Common.twitter.send_tweet(text)
-            except Common.Error, exception:
+            except Common.Error:
                 yield 10
             else:
                 break

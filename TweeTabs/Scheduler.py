@@ -21,7 +21,7 @@
 A Twitter reader and personal manager - Thread handling.
 """
 
-import gobject, heapq, random, time
+import gobject, heapq, random, time, traceback
 
 import Common
 
@@ -65,6 +65,9 @@ class Thread:
                 delta = self.iterator.next()
             except StopIteration:
                 scheduler.release_locks(self.locks)
+                return
+            except:
+                traceback.print_exc(file=sys.stderr)
                 return
             if delta is True:
                 scheduler.slow_down(self)

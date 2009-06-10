@@ -293,7 +293,7 @@ class Periodic(Preset):
         while True:
             try:
                 self.reload()
-            except Common.Error, exception:
+            except Common.Error:
                 yield 10
             else:
                 yield self.period
