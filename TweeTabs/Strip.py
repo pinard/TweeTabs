@@ -26,7 +26,7 @@ import Image, ImageDraw, StringIO
 import anydbm, atexit, gtk, pango, re, simplejson, time, urllib
 import twyt.data
 
-import Common, Scheduler
+import Common, Scheduler, Tab, Twitter
 
 image_size = 60
 image_loader_capacity = 100 
@@ -298,8 +298,8 @@ class Visible_user(Visible_strip):
 class User(Strip):
     visible_maker = Visible_user
 
-    def __init__(self, id):
-        self.user = user_loader.load(id)
+    def __init__(self, user):
+        self.user = user
         Strip.__init__(self, self.user.screen_name)
 
 ## Text services.
@@ -438,42 +438,56 @@ class User_loader:
         # and screen name.
         self.db = anydbm.open(Common.configdir + '/user-cache', 'c')
         atexit.register(self.db.close)
+        # Ids for which we would like to get a description.
+        self.missing_ids = set()
 
     def load(self, id):
-        id_string = str(id)
-        if self.db.has_key(id_string):
-            buffer = self.db[id_string]
+        if self.db.has_key(str(id)):
+            buffer = self.db[str(id)]
             try:
-                user = simplejson.loads(buffer)
+                return twyt.data.User(simplejson.loads(buffer))
             except ValueError:
                 # If anything is wrong, try auto-repairing the database.
-                del self.db[id_string]
-                user = None
-        else:
-            user = None
+                del self.db[str(id)]
+        thread_active = bool(self.missing_ids)
+        self.missing_ids.add(id)
+        if not thread_active:
+            Scheduler.Thread(self.load_missing_ids_thread())
 
-        if not user:
+    def load_missing_ids_thread(self):
+        while self.missing_ids:
+            # Pick any id, but do not remove it yet in case this id would
+            # be requested again by another thread, before we are done.
+            id = self.missing_ids.pop()
+            self.missing_ids.add(id)
 
-            Scheduler.Thread(self.load_user_thread(id))
-            user = {'id': id,
-                    'name': '',
-                    'screen_name': id_string,
-                    'location': None,
-                    'description': None,
-                    'profile_image_url': None,
-                    'url': None,
-                    'protected': False}
+            # Try fetching a description.
+            print "Before yield", id
+            yield True
+            print "After yield", id
+            try:
+                buffer = Common.twitter.get_user_info(id)
+            except Common.Error:
+                # If we do not get it, just ignore it
+                buffer = None
+            if not buffer:
+                self.missing_ids.remove(id)
+                continue
 
-        return twyt.data.User(user)
+            # Save the description.
+            self.db[str(id)] = buffer
 
-    def load_user_thread(self, id):
-        yield 0
-        try:
-            buffer = Common.twitter.get_user_info(id)
-        except Common.Error:
-            pass
-        else:
-            if buffer:
-                self.db[str(id)] = buffer
+            # Replace the old strip by a new one wherever appropriate.
+            new = self.load(id)
+            assert new is not None
+            old = User(Twitter.dummy_user(id))
+            for tab in Tab.Tab.registry.itervalues():
+                if isinstance(tab.strip_type, User):
+                    if old in tab.strips:
+                        tab.discard_strips([old])
+                        tab.add_strips([new])
+
+            # Ok, we are now done for real with this id.
+            self.missing_ids.remove(id)
 
 user_loader = User_loader()

@@ -108,20 +108,19 @@ class Twitter:
 
     @twytcall("fetching followers")
     def fetch_followers(self, tab):
-        tab.preset_strips = set(map(
-            Strip.User,
-            simplejson.loads(twytter.social_graph_followers_ids())))
+        tab.preset_strips = user_strips_from_json(
+                twytter.social_graph_followers_ids())
         tab.refresh()
 
     @twytcall("fetching following")
     def fetch_following(self, tab):
-        tab.preset_strips = set(map(
-            Strip.User,
-            simplejson.loads(twytter.social_graph_friends_ids())))
+        tab.preset_strips = user_strips_from_json(
+            twytter.social_graph_friends_ids())
         tab.refresh()
 
     @twytcall("getting user info")
     def get_user_info(self, id):
+        print "Getting", repr(id), "info"
         return twytter.user_show(id)
 
     @twytcall("loading direct timeline")
@@ -176,6 +175,21 @@ class Twitter:
                 '<span  size="small" foreground="gray50">%s/%s</span>'
                  % (self.auth_limit, self.ip_limit))
         Common.gui.refresh()
+
+def user_strips_from_json(json):
+    return set(Strip.User(Strip.user_loader.load(id) or dummy_user(id))
+               for id in simplejson.loads(json))
+
+def dummy_user(id):
+    return twyt.data.User({
+        'id': id,
+        'name': '',
+        'screen_name': str(id),
+        'location': None,
+        'description': None,
+        'profile_image_url': None,
+        'url': None,
+        'protected': False})
 
 if Common.threaded:
 

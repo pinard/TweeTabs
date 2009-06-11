@@ -21,7 +21,7 @@
 A Twitter reader and personal manager - Thread handling.
 """
 
-import gobject, heapq, random, time, traceback
+import gobject, heapq, random, sys, time, traceback
 
 import Common
 
@@ -146,7 +146,8 @@ class Scheduler:
         self.slowed_down_threads.append(thread)
         if (not self.within_slow_down_loop
                 and len(self.slowed_down_threads) == 1):
-            gobject.timeout_add(self.slow_down_delta(), self.slow_down_loop)
+            gobject.timeout_add(1000 * self.slow_down_delta(),
+                                self.slow_down_loop)
 
     def slow_down_loop(self):
         self.within_slow_down_loop = True
@@ -154,7 +155,8 @@ class Scheduler:
         self.slowed_down_threads.pop(pick).advance()
         Common.twitter.auth_limit -= 1
         if self.slowed_down_threads:
-            gobject.timeout_add(self.slow_down_delta(), self.slow_down_loop)
+            gobject.timeout_add(1000 * self.slow_down_delta(),
+                                self.slow_down_loop)
         self.within_slow_down_loop = False
 
     def create_slow_down_deltas(self):
