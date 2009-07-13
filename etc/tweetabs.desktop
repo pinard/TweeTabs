@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Name=TweeTabs
+GenericName=TweeTabs
+Comment=TweeTabs
+Exec=tweetabs
+Terminal=false
+Type=Application
+Icon=tweetabs
+StartupNotify=false
