@@ -486,6 +486,8 @@ class User_loader:
                     if old in tab.strips:
                         tab.discard_strips([old])
                         tab.add_strips([new])
+                        # Check!
+                        tab.refresh()
 
             # Ok, we are now done for real with this id.
             self.missing_ids.remove(id)
