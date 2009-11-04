@@ -100,7 +100,7 @@ class Main:
             if os.path.exists(Common.configdir + '/tabsetup.py'):
                 context = dict(Tab.__dict__)
                 context['configdir'] = Common.configdir
-                context['delay'] = Common.gui.delay
+                context['delay'] = Scheduler.scheduler.delay
                 execfile(Common.configdir + '/tabsetup.py', context, {})
             else:
                 user = Tab.User_timeline()
