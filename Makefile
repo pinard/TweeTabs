@@ -1,5 +1,8 @@
+all:
+	python setup.py --quiet build
+
 test: install
 	tweetabs -c data
 
-install:
-	python setup.py --quiet install 
+install: all
+	python setup.py install 
