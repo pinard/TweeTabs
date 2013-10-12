@@ -1,8 +1,0 @@
-syntax: glob
-build/
-tweetabs.wpu
-TAGS
-admin
-dot-tweetabs
-essais
-web
